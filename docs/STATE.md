@@ -123,7 +123,8 @@ It writes a PNG of the last presented frame and exits on its own.
 
 1. ~~**Execution mode**~~ — resolved: subagent-driven. Fresh implementer per
    task on sonnet/haiku, an independent task review after each, this session as
-   QC. Ledger at `.superpowers/sdd/2026-08-29-noise-floor-gameplay/progress.md`.
+   QC. The run's working ledger was scratch and has been deleted; its conclusions
+   live in [DEMO-NOTES.md](DEMO-NOTES.md) and in this file.
 2. **`spike-kaiju/` is still on disk** — ~130 MB of throwaway feasibility spike
    (engine clone, binary, video capture). Gitignored and safe to delete; kept
    only because deleting it was never explicitly approved.
