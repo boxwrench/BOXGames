@@ -30,8 +30,8 @@ especially visible: a rivet that crawls reads instantly as wrong.
 | H3 turbo LoRAs | 4-step and 8-step sampling |
 | Flux 2 Klein 9B (Q8 GGUF) | Stills: horde variants, bosses, icons, card art |
 | `80sFantasyKlein9b` LoRA | Close to the lore's "1980s retro-futuristic robotics" |
-| RIFE 4.26 | Frame interpolation / resampling to a target count |
-| SeedVR2 | Restoration before packing |
+| SeedVR2 | Restoration/upscale before packing (`ComfyUI-SeedVR2_VideoUpscaler`) |
+| VideoHelperSuite | `VHS_LoadVideo` / `VHS_VideoCombine` for frame I/O |
 
 GPU[1] has 34 GB, so the int8/fp8 H3 builds (~20 GB) fit comfortably.
 
@@ -46,24 +46,37 @@ tool. Two properties matter:
 
 - **`ref2v`** seeds from an existing stance, so the character is preserved
   rather than reinvented per frame.
-- **`fl2v`** takes a first *and* last frame. Passing **the same image for both**
+- **`fl2v`** takes a first *and* last frame (node `MiniMaxH3ImageToVideo`, with
+  optional `first_frame` and `last_frame`). Passing **the same image for both**
   produces a seamless loop — the exact requirement for idle and walk cycles,
   solved structurally rather than by hand-fixing the wrap.
+
+### Not available, despite being on disk
+
+`rife4.26.pkl` exists under `/ai/models`, but **no RIFE or frame-interpolation
+node is installed in ComfyUI**, and **no background-removal node** (rembg/RMBG)
+is installed either. Frame resampling and alpha cutting therefore happen in our
+own Python, outside ComfyUI — `ffmpeg` for frame extraction and Pillow for the
+alpha cut and trim. Do not plan a graph around nodes that are not there.
 
 ## Pipeline
 
 ```
-source stance ──▶ H3 ref2v / fl2v ──▶ RIFE resample ──▶ SeedVR2 clean
-                                                             │
-                            alpha cut ◀── trim ◀── pack ◀─────┘
-                                 │
-                                 ▼
-              games/<game>/assets/sheets/*.png  +  clip metadata
-                                 │
-                    scripts/build-content.sh (flatten)
-                                 ▼
-                     games/<game>/content/  (generated)
+source stance ──▶ ComfyUI: H3 ref2v / fl2v ──▶ (optional SeedVR2) ──▶ SaveVideo
+                                                                        │
+   games/<game>/assets/sheets/  ◀── pack ◀── trim ◀── alpha cut ◀── ffmpeg
+     <name>.png + <name>.png.json                    (our Python, not ComfyUI)
+                       │
+          scripts/build-content.sh (flatten)
+                       ▼
+            games/<game>/content/  (generated)
 ```
+
+ComfyUI is driven over its HTTP API: `POST /prompt` with an **API-format** graph
+(a flat `{node_id: {class_type, inputs}}` dict — *not* the UI's `nodes`/`links`
+save format), then poll `GET /history/{prompt_id}` until `status.completed`, then
+fetch outputs via `GET /view?filename=…&subfolder=…&type=output`. Server default
+is `127.0.0.1:8188`.
 
 Sheets and clip metadata are committed. Intermediate frames are not —
 `tools/spritegen/out/` is gitignored.
