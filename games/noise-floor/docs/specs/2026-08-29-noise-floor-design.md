@@ -134,25 +134,34 @@ Brotato's game feel is almost entirely this rather than its art.
 ## 5. Architecture
 
 ```
-BOXGames/
+games/noise-floor/
   cmd/noisefloor/          main + bootstrap.GameInterface implementation
   internal/
     arena/                 fixed camera, bounds, corruption model
     actor/                 player, enemy behaviours
     weapon/                fire timers, projectile pools
     horde/                 spawner, wave director
-    vfx/                   flash, shake, numbers, particles, hit-stop
+    vfx/                   demo-specific effects; game feel lives in shared/juice
     progression/           XP, Directive cards, shop
-    render/                stain shader, materials, sheet loading
-  content/                 textures, shaders, materials, sprite sheets
-  tools/spritegen/         offline ComfyUI drivers (never runtime)
-  third_party/kaiju        pinned engine checkout, never edited
+    render/                stain shader, materials, sheet binding
+  assets/                  authored content, organised (committed)
+  content/                 generated flat database (gitignored)
+  docs/specs/              this document
 ```
+
+NOISE FLOOR is one demo in the BOXGames monorepo; anything a second demo would
+also want lives higher up (`shared/palette`, `shared/pool`, `shared/juice`,
+`shared/kaijuboot`, `tools/spritegen`). See `docs/ARCHITECTURE.md`.
 
 A game consumes Kaiju as a library: implement `bootstrap.GameInterface`
 (`Launch`, `PluginRegistry`, `ContentDatabase`) and call `bootstrap.Main`.
 Because the game supplies its own `ContentDatabase`, all project content lives
-in this repo. The engine checkout is pinned and read-only.
+in this repo and the engine checkout stays pinned and read-only.
+
+The engine's asset database is flat and keyed by bare filename, so authored
+assets in `assets/` are flattened into a generated `content/` directory at build
+time, then layered over the engine's stock content by
+`shared/kaijuboot.LayeredDatabase`. See `docs/KAIJU-NOTES.md`.
 
 ### 5.1 Corruption is CPU-authoritative
 

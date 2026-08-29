@@ -1,0 +1,10 @@
+go 1.26.0
+
+use (
+	./shared
+	./games/noise-floor
+)
+
+// The engine is a pinned, read-only checkout fetched by scripts/bootstrap.sh.
+// It is not vendored into git: see third_party/ENGINE_PIN for the commit.
+replace kaijuengine.com => ./third_party/kaiju/src
