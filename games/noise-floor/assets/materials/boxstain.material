@@ -1,0 +1,1 @@
+{"Name":"boxstain","Shader":"boxstain.shader","RenderPass":"opaque.renderpass","ShaderPipeline":"basic.shaderpipeline","Textures":[{"Texture":"square.png","Filter":""}]}
