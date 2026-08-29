@@ -13,11 +13,14 @@ import (
 )
 
 // Arena framing. The camera never scrolls, so every sprite sits at a known
-// scale (design spec 1). cameraZ frames roughly 26x15 world units at 16:9.
+// scale (design spec 1). At the gameplay plane (z=0) the camera frames ~28.7x16.2
+// world units at 16:9. The stain quad sits at z=-3 where the frustum is ~34.9x19.6.
+// The quad is deliberately oversized to 48x22 so it bleeds past the frustum at
+// every aspect ratio out to 2.45:1, covering the screen with a single quad.
 const (
 	cameraZ       = 14.0
-	stainWidth    = 26.0
-	stainHeight   = 15.0
+	stainWidth    = 48.0
+	stainHeight   = 22.0
 	safeRadiusMax = 6.5
 	safeRadiusMin = 1.5
 	playerSpeed   = 4.5
