@@ -1,6 +1,6 @@
 # Where things stand
 
-Last updated: 2026-08-29 (after gameplay tasks 1–5). Update this when the state below stops being true.
+Last updated: 2026-08-29 (after gameplay tasks 1–5, branch reviewed and complete). Update this when the state below stops being true.
 
 ## Cold start
 
@@ -23,14 +23,14 @@ Verified from an empty environment (`env -i`, no `PATH` additions, no
 | --- | --- |
 | Monorepo scaffold, workspace, build scripts | Working |
 | `make bootstrap / build / run / test / vet / fmt / clean` | Working |
-| NOISE FLOOR binary | First playable. Paper field, corruption stain eating inward, WASD movement clamped to the shrinking safe zone. |
+| NOISE FLOOR binary | First playable **on `feat/noise-floor-gameplay`, not `main`**. Paper field with grain, corruption model, BX-77 as a placeholder ink square under WASD. No enemies, weapons, or waves. |
 | `shared/palette`, `shared/pool` | Implemented, tested |
 | `shared/kaijuboot` layered content database | Implemented |
 | `shared/spritesheet` | Tests only — they pin engine limitations. No implementation yet. |
 | `shared/juice` | Empty, doc only |
 | `tools/spritegen` | Plan only, no code |
 
-`make test` passes.
+`make test` passes, and the suite is clean under `-race`.
 
 ## What is generated, not committed
 
@@ -50,8 +50,10 @@ and ALSA headers).
 
 ### Where the work lives
 
-Gameplay tasks 1–5 are on branch **`feat/noise-floor-gameplay`**, not `main`.
-Six commits off `dc1489d`:
+Gameplay tasks 1–5, plus two follow-ups, are on branch
+**`feat/noise-floor-gameplay`** — 11 commits off `dc1489d`, **not merged to
+`main`**. Every task was independently reviewed, the whole branch passed a final
+review, and the test suite is clean under `-race`.
 
 | Commit | What |
 | --- | --- |
@@ -61,51 +63,61 @@ Six commits off `dc1489d`:
 | `d44e174` | `boxstain` shader, shader + material descriptors |
 | `4dfc732` | arena assembly — first playable |
 | `23d5e48` | stain quad geometry fix (frustum coverage) |
+| `de23fa1` | `debugcap` — GPU screenshot hook |
+| `84bdd51` | `make fmt` fix, player marker, configurable capture frames |
+| `af63444` | final review fixes (clamp, tests, palette tripwire) |
 
-The authoritative record of the run — every dispatch, every review verdict,
-every deferred minor, and every ruling made on your behalf — is the SDD ledger:
-`.superpowers/sdd/2026-08-29-noise-floor-gameplay/progress.md`. It is
-git-ignored scratch, so `git clean -fdx` destroys it; the commits above survive
-regardless. Task briefs, implementer reports, and review diffs sit beside it.
+Iteration notes for the next demo: [DEMO-NOTES.md](DEMO-NOTES.md).
 
-### Immediately next, in order
+### Blocking prerequisite before Task 7
 
-1. **Task 5b is in flight** — a debug screenshot hook
-   (`games/noise-floor/internal/debugcap`) using the engine's
-   `rendering.GPUDevice.ScreenshotRGBA()`. Pulled forward from plan Task 11 by
-   ruling, because nothing else on this box can see what the game renders. Brief
-   is at `task-5b-brief.md` in the ledger directory; if the dispatch was lost,
-   re-dispatch from that brief. Check `git log` first — it may have landed.
-2. **Final whole-branch review has NOT run.** It is the last gate before the
-   branch is finishable, and it should triage the deferred minors the per-task
-   reviews parked (they are listed inline in the ledger, tagged
-   `minor (deferred)`). Use `scripts/review-package <plan> dc1489d HEAD` and the
-   `superpowers:requesting-code-review` reviewer prompt, on the most capable
-   model.
-3. **Then finish the branch** — `superpowers:finishing-a-development-branch`.
-   Nothing has been merged to `main` and nothing has been pushed anywhere.
+**The visual stain front and `SafeRadius()` are not calibrated to each other.**
+Found by the whole-branch review; no per-task review could see it, because the
+shader task and the arena task were each correct alone.
 
-### After that
+`safeRadiusMax = 6.5` clamps the player to roughly 45% of the visible width, so
+on launch you can hold D and stop dead in unmarked cream paper with a third of
+the screen still visibly playable. Separately, `boxstain.frag` thresholds its
+noise field in the *quad's* UV space, and the stain quad is 48×22 — anisotropic
+— so the stain front is a screen-space ellipse with no world-unit relationship
+to the boundary the CPU owns at any corruption level. Spec §5.1 promises the
+visual edge wobbles ±5% around that radius. It does not.
+
+Fix direction: pass the shader `SafeRadius()/quadHalfExtent` rather than
+`Level()`, and scale UV by the quad's aspect so `edge` is isotropic. Or, as a
+floor, raise `safeRadiusMax` to ~8.0 so the clamp meets the vertical screen edge.
+
+**Settle this before Task 7 (enemies).** Task 7 spawns enemies "outside the safe
+zone", which at 6.5 is still well inside the visible field — enemies would pop
+into view on clean paper, and spawn placement would have to be redone after any
+framing change. Task 8 owns corruption pressure, but the framing must be right
+first. Doing this also retires the known cosmetic defect where the shader leaves
+faint unconsumed specks at corruption level 1.
+
+Nobody has yet captured the stain at a corruption level above ~0.06, so its
+appearance mid-transition is still unobserved. Capture it before changing it.
+
+### Then
 
 [`games/noise-floor/docs/plans/2026-08-29-noise-floor-gameplay.md`](../games/noise-floor/docs/plans/2026-08-29-noise-floor-gameplay.md)
-tasks 6–14. **They are specified but not expanded to step level** (files,
-interfaces, and test strategy only). Expand a task before executing it. Note
-that plan Task 11's screenshot slice is partly consumed by 5b above.
+tasks 6–14. **They are specified but not expanded to step level.** Expand a task
+before executing it. The plan's task-summary list previously disagreed with its
+own expanded entries; it has been corrected, and the expanded entries own the
+requirements.
 
 Same split in the art pipeline plan ([`tools/spritegen/PLAN.md`](../tools/spritegen/PLAN.md)):
 tasks 1–2 ready, 3–6 need expanding.
 
-### Demo notes worth carrying forward
+### Seeing the game
 
-- The plan's framing numbers were wrong and a review caught it. Perspective
-  camera, 60° **vertical** FOV: at distance *d* the visible height is
-  `2*d*tan(30°)` and width is that times the aspect ratio. Any future
-  full-screen backdrop must be sized from that, at its own depth, not eyeballed.
-- Per-task review earned its cost twice: once for the geometry bug above, once
-  for catching a factually wrong claim in an implementer's own report.
-- Cheap models handled transcription-shaped tasks and single-constant fixes
-  without trouble. Judgment-shaped work (arena assembly, the capture hook)
-  needed a mid-tier model.
+External screen capture does not work here (see Risks). Use the built-in hook:
+
+```sh
+cd games/noise-floor
+NOISEFLOOR_CAPTURE=/tmp/shot.png NOISEFLOOR_CAPTURE_FRAMES=360 ./bin/noise-floor
+```
+
+It writes a PNG of the last presented frame and exits on its own.
 
 ## Open decisions
 
