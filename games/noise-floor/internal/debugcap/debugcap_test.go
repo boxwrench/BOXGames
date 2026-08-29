@@ -82,3 +82,25 @@ func TestEncodePNGRejectsLongPixelSlice(t *testing.T) {
 		t.Fatalf("encodePNG() wrote %d bytes on error, want 0", buf.Len())
 	}
 }
+
+func TestCaptureFrames(t *testing.T) {
+	const fallback = 30
+	tests := []struct {
+		name string
+		env  string
+		want int
+	}{
+		{"empty string falls back", "", fallback},
+		{"valid positive number is used", "360", 360},
+		{"zero falls back", "0", fallback},
+		{"negative number falls back", "-5", fallback},
+		{"non-numeric string falls back", "banana", fallback},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := captureFrames(tt.env, fallback); got != tt.want {
+				t.Fatalf("captureFrames(%q, %d) = %d, want %d", tt.env, fallback, got, tt.want)
+			}
+		})
+	}
+}

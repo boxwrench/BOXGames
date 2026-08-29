@@ -24,6 +24,7 @@ const (
 	safeRadiusMax = 6.5
 	safeRadiusMin = 1.5
 	playerSpeed   = 4.5
+	playerSize    = 0.6
 )
 
 type Arena struct {
@@ -54,6 +55,11 @@ func New(host *engine.Host) (*Arena, error) {
 		Player:     actor.NewPlayer(host, playerSpeed),
 		stain:      stain,
 	}
+
+	if err := render.NewMarker(host, &a.Player.Entity.Transform, playerSize, palette.Ink()); err != nil {
+		return nil, fmt.Errorf("arena: creating player marker: %w", err)
+	}
+
 	a.updateID = host.Updater.AddUpdate(a.Update)
 	return a, nil
 }

@@ -14,6 +14,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strconv"
 
 	"kaijuengine.com/engine"
 	"kaijuengine.com/rendering"
@@ -23,12 +24,14 @@ import (
 // variable is set to a non-empty path, the game renders `frames` frames, writes
 // a PNG of the last presented frame to that path, and then closes the host.
 // When the variable is empty or unset, Arm does nothing and the game runs
-// normally.
+// normally. The frame count itself can be overridden with the
+// NOISEFLOOR_CAPTURE_FRAMES environment variable; see captureFrames.
 func Arm(host *engine.Host, frames int) {
 	path := os.Getenv("NOISEFLOOR_CAPTURE")
 	if path == "" {
 		return
 	}
+	frames = captureFrames(os.Getenv("NOISEFLOOR_CAPTURE_FRAMES"), frames)
 	host.RunAfterFrames(frames, func() {
 		host.RunOnRenderThread(func(device *rendering.GPUDevice) {
 			pixels, err := device.ScreenshotRGBA()
@@ -74,4 +77,25 @@ func encodePNG(w io.Writer, pixels []byte, width, height int) error {
 	}
 	_, err := w.Write(buf.Bytes())
 	return err
+}
+
+// captureFrames resolves the frame count to capture at from an environment
+// variable value. An empty, unparseable, or non-positive value falls back to
+// fallback; an unparseable or non-positive value is logged as a warning first.
+// Capturing at frame 0 or a negative frame is meaningless, so those fall back
+// too.
+func captureFrames(env string, fallback int) int {
+	if env == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(env)
+	if err != nil {
+		slog.Warn("debugcap: NOISEFLOOR_CAPTURE_FRAMES is not a number, using fallback", "value", env, "fallback", fallback)
+		return fallback
+	}
+	if n <= 0 {
+		slog.Warn("debugcap: NOISEFLOOR_CAPTURE_FRAMES must be positive, using fallback", "value", env, "fallback", fallback)
+		return fallback
+	}
+	return n
 }

@@ -41,7 +41,7 @@ vet: ## Vet all workspace packages
 
 .PHONY: fmt
 fmt: ## Format all Go code
-	@. scripts/env.sh && go fmt ./shared/... $$(ls -d games/*/ | sed 's|$$|...|;s|^|./|')
+	@. scripts/env.sh && gofmt -l -w shared games tools
 
 .PHONY: sync-content
 sync-content: ## Re-sync engine stock content (flat database)
