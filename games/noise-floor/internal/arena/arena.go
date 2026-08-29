@@ -32,7 +32,38 @@ type Arena struct {
 	Corruption *Corruption
 	Player     *actor.Player
 	stain      *render.Stain
+	marker     *render.Marker
+	receding   bool
 	updateID   engine.UpdateId
+}
+
+// breathPhase decides whether the demo loop should be washing the page back
+// this frame. Tasks 1-5 only ever advance, so the page reaches full ink in
+// ~8.3s and stays there; the wave director (Task 8) is what will really drive
+// this. Until then the arena breathes so there is something to watch.
+func breathPhase(level float32, receding bool) bool {
+	if receding {
+		return level > 0
+	}
+	return level >= 1
+}
+
+// markerColor keeps the player legible as the ground inverts: ink on cream at
+// level 0, cream on ink at level 1. This is spec §10 risk 1 (horde value
+// treatment) in its cheapest possible form, for the player only.
+func markerColor(level float32) matrix.Color {
+	if level < 0 {
+		level = 0
+	} else if level > 1 {
+		level = 1
+	}
+	ink, paper := palette.Ink(), palette.Paper()
+	return matrix.NewColor(
+		ink.R()+(paper.R()-ink.R())*level,
+		ink.G()+(paper.G()-ink.G())*level,
+		ink.B()+(paper.B()-ink.B())*level,
+		1,
+	)
 }
 
 func New(host *engine.Host) (*Arena, error) {
@@ -56,18 +87,28 @@ func New(host *engine.Host) (*Arena, error) {
 		stain:      stain,
 	}
 
-	if err := render.NewMarker(host, &a.Player.Entity.Transform, playerSize, palette.Ink()); err != nil {
+	marker, err := render.NewMarker(host, &a.Player.Entity.Transform, playerSize, palette.Ink())
+	if err != nil {
 		return nil, fmt.Errorf("arena: creating player marker: %w", err)
 	}
+	a.marker = marker
 
 	a.updateID = host.Updater.AddUpdate(a.Update)
 	return a, nil
 }
 
-// Update advances one frame. Corruption advances continuously for now; the wave
-// director takes over the pressure input in Task 7.
+// Update advances one frame. Corruption breathes in and out on a loop until the
+// wave director (Task 8) owns the pressure input for real.
 func (a *Arena) Update(dt float64) {
-	a.Corruption.Advance(dt, 1.0)
-	a.stain.SetLevel(a.Corruption.Level())
+	if a.receding {
+		a.Corruption.Recede(dt)
+	} else {
+		a.Corruption.Advance(dt, 1.0)
+	}
+	level := a.Corruption.Level()
+	a.receding = breathPhase(level, a.receding)
+
+	a.stain.SetLevel(level)
+	a.marker.SetColor(markerColor(level))
 	a.Player.Update(actor.SampleMove(&a.host.Window.Keyboard), a.Corruption, dt)
 }
