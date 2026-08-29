@@ -653,16 +653,19 @@ git commit -m "feat(actor): sample movement input from the keyboard"
 
 ## Remaining tasks
 
-Tasks 4–11 are drafted below and finalised once the outstanding API research lands (sprite-sheet format and UI system). They are listed here so the shape of the whole plan is visible:
+Tasks 4–14 are drafted below and finalised once the outstanding API research lands (sprite-sheet format and UI system). They are listed here so the shape of the whole plan is visible. **This summary is authoritative only for numbering; the expanded entries further down are the requirements.**
 
 - **Task 4:** Stain shader re-authored in `assets/`, with `DrawInstanceData: "unlit"`, driven per-frame by `Corruption.Level()`.
 - **Task 5:** Arena assembly — fixed camera, paper clear color, stain background, player wired to input. First playable: move BX-77 around a shrinking page.
-- **Task 6:** Enemy archetypes and pooled spawning outside the safe zone.
-- **Task 7:** Wave director — schedule, composition, clear detection, corruption recede on clear.
-- **Task 8:** Weapons and pooled projectiles with independent fire timers.
-- **Task 9:** Damage, health, death, and the juice layer (hit flash, knockback, shake, hit-stop, damage numbers).
-- **Task 10:** XP gems with magnetism, levelling, Directive cards, RECALIBRATION shop.
-- **Task 11:** Visual regression integration tests using the engine's screenshot and video capture.
+- **Task 6:** Sprite animator in `shared/spritesheet` — the engine's own path is broken, see below.
+- **Task 7:** Enemy archetypes and pooled spawning outside the safe zone.
+- **Task 8:** Wave director — schedule, composition, clear detection, corruption recede on clear.
+- **Task 9:** Weapons and pooled projectiles with independent fire timers.
+- **Task 10:** Damage, health, death, and the juice layer (hit flash, knockback, shake, hit-stop, damage numbers).
+- **Task 11:** XP gems with magnetism, levelling, Directive cards, RECALIBRATION shop.
+- **Task 12:** Horde value treatment — gates all horde art generation.
+- **Task 13:** Boss: Local Optimum.
+- **Task 14:** Visual regression integration tests using the engine's screenshot and video capture.
 
 ---
 
