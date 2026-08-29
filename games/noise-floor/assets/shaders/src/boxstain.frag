@@ -11,8 +11,10 @@
 
 #include "kaiju.glsl"
 
-// Entropy staining the page. Corruption level arrives as fragColor.r.
-// The CPU owns the true boundary radius; this only decorates it (spec 5.1).
+// Entropy staining the page. The CPU-authoritative boundary arrives packed
+// into fragColor: .r safe radius (world units), .gb stain quad width/height
+// (world units), .a corruption level (0 clean, 1 consumed). This shader
+// decorates that boundary with noise but never redefines it (spec 5.1).
 
 const vec3 PAPER = vec3(0.957, 0.937, 0.894); // #F4EFE4
 const vec3 INK   = vec3(0.090, 0.086, 0.106); // #17161B
@@ -42,21 +44,26 @@ float fbm(vec2 p) {
     return v;
 }
 
+// Softness of the corruption front, in world units.
+const float FRONT_SOFTNESS = 0.6;
+
 void main() {
     vec2 uv = fragTexCoords;
-    float corruption = clamp(fragColor.r, 0.0, 1.0);
+    float safeRadius = fragColor.r;
+    vec2  quad       = fragColor.gb;          // world units
+    float corruption = clamp(fragColor.a, 0.0, 1.0);
+
+    vec2  p = (uv - 0.5) * quad;              // world offset from the arena centre
+    float r = length(p);
 
     vec2 q = uv * 4.0;
     float drift = time * 0.06;
     float n = fbm(q + vec2(drift, -drift * 0.7));
     n = mix(n, fbm(q * 2.3 - vec2(drift * 1.7, drift)), 0.45);
 
-    // Edges rot first; the centre holds longest.
-    float edge = length((uv - 0.5) * 2.0);
-    float bias = smoothstep(0.15, 1.25, edge);
-    float field = n * 0.6 + bias * 0.4;
-    float t = 1.12 - corruption * 1.24;
-    float stain = smoothstep(t, t + 0.22, field);
+    float wobble = 1.0 + (n - 0.5) * 0.10;    // +-5%, per spec 5.1
+    float front  = safeRadius * wobble;
+    float stain  = smoothstep(front, front + FRONT_SOFTNESS, r);
 
     vec3 col = mix(PAPER, INK, stain);
 

@@ -17,11 +17,18 @@ import (
 // world units at 16:9. The stain quad sits at z=-3 where the frustum is ~34.9x19.6.
 // The quad is deliberately oversized to 48x22 so it bleeds past the frustum at
 // every aspect ratio out to 2.45:1, covering the screen with a single quad.
+//
+// safeRadiusMax is calibrated to that framing, not chosen freely: it is the
+// gameplay-plane half-height, cameraZ * tan(30 deg) with a 60 deg vertical
+// FOV (~8.08, rounded to 8.1). The safe circle therefore touches the top and
+// bottom screen edges, and a clean page starts with only the four corners
+// inked. TestSafeRadiusMaxMatchesGameplayPlaneHalfHeight enforces this pair
+// stays calibrated.
 const (
 	cameraZ       = 14.0
 	stainWidth    = 48.0
 	stainHeight   = 22.0
-	safeRadiusMax = 6.5
+	safeRadiusMax = 8.1
 	safeRadiusMin = 1.5
 	playerSpeed   = 4.5
 	playerSize    = 0.6
@@ -108,7 +115,7 @@ func (a *Arena) Update(dt float64) {
 	level := a.Corruption.Level()
 	a.receding = breathPhase(level, a.receding)
 
-	a.stain.SetLevel(level)
+	a.stain.SetBoundary(a.Corruption.SafeRadius(), level)
 	a.marker.SetColor(markerColor(level))
 	a.Player.Update(actor.SampleMove(&a.host.Window.Keyboard), a.Corruption, dt)
 }

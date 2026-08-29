@@ -16,6 +16,8 @@ import (
 type Stain struct {
 	shaderData *shader_data_registry.ShaderDataUnlit
 	entity     *engine.Entity
+	width      float32
+	height     float32
 }
 
 // NewStain creates the background quad. width and height are in world units and
@@ -40,7 +42,8 @@ func NewStain(host *engine.Host, width, height float32) (*Stain, error) {
 			"render: boxstain resolved instance data %q, want \"unlit\"; check DrawInstanceData in the shader descriptor",
 			mat.Shader.DrawInstanceDataName())
 	}
-	sd.Color = matrix.NewColor(0, 0, 0, 1) // .r carries corruption level
+	// .r safe radius, .g/.b stain quad width/height (all world units), .a level.
+	sd.Color = matrix.NewColor(0, width, height, 0)
 	sd.UVs = matrix.NewVec4(0, 0, 1, 1)
 
 	e := engine.NewEntity(host.WorkGroup())
@@ -54,10 +57,11 @@ func NewStain(host *engine.Host, width, height float32) (*Stain, error) {
 		Transform:  &e.Transform,
 		ViewCuller: &host.Cameras.Primary,
 	})
-	return &Stain{shaderData: sd, entity: e}, nil
+	return &Stain{shaderData: sd, entity: e, width: width, height: height}, nil
 }
 
-// SetLevel uploads the corruption level, 0 (clean) to 1 (consumed).
-func (s *Stain) SetLevel(level float32) {
-	s.shaderData.Color = matrix.NewColor(level, 0, 0, 1)
+// SetBoundary uploads the CPU-authoritative boundary. safeRadius is in world
+// units; level is 0 (clean) to 1 (consumed) and drives decoration only.
+func (s *Stain) SetBoundary(safeRadius, level float32) {
+	s.shaderData.Color = matrix.NewColor(safeRadius, s.width, s.height, level)
 }
