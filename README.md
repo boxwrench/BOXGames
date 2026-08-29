@@ -56,6 +56,7 @@ See [docs/NEW-GAME.md](docs/NEW-GAME.md).
 
 ## Documentation
 
+- **[docs/STATE.md](docs/STATE.md) — where things stand and what to do next. Start here.**
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layout, module strategy, and why
 - [docs/SETUP.md](docs/SETUP.md) — toolchain details and troubleshooting
 - [docs/KAIJU-NOTES.md](docs/KAIJU-NOTES.md) — engine gotchas that cost real time
