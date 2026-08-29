@@ -197,6 +197,80 @@ func TestLancerFullCycle(t *testing.T) {
 	}
 }
 
+// TestLancerOvershotTimeCarriesForwardBetweenPhases verifies that when a
+// single frame stutter causes the timer to overshoot a phase boundary, the
+// excess time is carried to the next phase rather than discarded. Telegraph
+// and Charge must take their specified durations even with variable frame rates.
+func TestLancerOvershotTimeCarriesForwardBetweenPhases(t *testing.T) {
+	// Telegraph is 0.45s, Charge is 0.55s.
+	// Use dt = 0.25s to engineer a scenario where overshoot matters.
+	// On frame 3, timer hits 0.50s in Telegraph (0.05s overshoot).
+	// With fix: overshoot carries to Charge, Charge ends on frame 5.
+	// Without fix: overshoot discarded, Charge ends on frame 6.
+	const dt = 0.25
+	brain := &LancerBrain{}
+	pos := matrix.NewVec2(0, 0)
+	target := matrix.NewVec2(5, 0) // within trigger range
+
+	// Frame 1: enter Telegraph
+	brain.Update(dt, pos, target)
+	if brain.State() != LancerTelegraph {
+		t.Fatalf("Frame 1: state = %v, want LancerTelegraph", brain.State())
+	}
+
+	// Frame 2: accumulate in Telegraph
+	brain.Update(dt, pos, target)
+	if brain.State() != LancerTelegraph {
+		t.Fatalf("Frame 2: state = %v, want LancerTelegraph", brain.State())
+	}
+
+	// Frame 3: overshoot Telegraph, enter Charge
+	// timer = 0.25 + 0.25 = 0.50 >= 0.45, transition to Charge
+	// With fix: timer = 0.50 - 0.45 = 0.05
+	// Without fix: timer = 0
+	brain.Update(dt, pos, target)
+	if brain.State() != LancerCharge {
+		t.Fatalf("Frame 3: state = %v, want LancerCharge", brain.State())
+	}
+
+	// Frame 4: accumulate in Charge
+	// With fix: timer = 0.05 + 0.25 = 0.30
+	// Without fix: timer = 0 + 0.25 = 0.25
+	brain.Update(dt, pos, target)
+	if brain.State() != LancerCharge {
+		t.Fatalf("Frame 4: state = %v, want LancerCharge", brain.State())
+	}
+
+	// Frame 5: accumulate further in Charge
+	// With fix: timer = 0.30 + 0.25 = 0.55 >= 0.55, transition to Cruise
+	// Without fix: timer = 0.25 + 0.25 = 0.50 < 0.55, stay in Charge
+	// WITH FIX: we expect Cruise. WITHOUT FIX: we expect Charge still.
+	brain.Update(dt, pos, target)
+	if brain.State() != LancerCruise {
+		t.Fatalf("Frame 5: state = %v, want LancerCruise (overshoot should have been carried forward)", brain.State())
+	}
+}
+
+// TestLancerEnterTelegraphHandlesCoincidentPositions verifies that when a
+// Lancer is sitting exactly on the player (pos == target), enterTelegraph
+// guards against the zero-vector normal producing NaN and behaves sensibly.
+func TestLancerEnterTelegraphHandlesCoincidentPositions(t *testing.T) {
+	const dt = 0.05
+	brain := &LancerBrain{}
+	p := matrix.NewVec2(3, 3)
+	// pos == target: direction is undefined, must not produce NaN.
+	vel := brain.Update(dt, p, p)
+	if brain.State() != LancerTelegraph {
+		t.Fatalf("State() = %v, want LancerTelegraph", brain.State())
+	}
+	if vel.IsNaN() {
+		t.Fatal("Update at coincident positions produced NaN velocity")
+	}
+	if !vel.IsZero() {
+		t.Fatalf("velocity when entering Telegraph at coincident position = %v, want zero", vel)
+	}
+}
+
 // TestLancerDirectionLocksAtTelegraphStart is the important one: the charge
 // direction must be fixed the instant Telegraph begins and must not change
 // even if the target moves during Telegraph or Charge.

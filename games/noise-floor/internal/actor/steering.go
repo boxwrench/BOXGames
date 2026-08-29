@@ -89,13 +89,13 @@ func (l *LancerBrain) Update(dt float64, pos, target matrix.Vec2) matrix.Vec2 {
 		l.timer += fdt
 		if l.timer >= LancerTelegraphSeconds {
 			l.state = LancerCharge
-			l.timer = 0
+			l.timer -= LancerTelegraphSeconds
 		}
 	case LancerCharge:
 		l.timer += fdt
 		if l.timer >= LancerChargeSeconds {
 			l.state = LancerCruise
-			l.timer = 0
+			l.timer -= LancerChargeSeconds
 		}
 	}
 
