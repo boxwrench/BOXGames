@@ -1,0 +1,6 @@
+# Throwaway feasibility spike - engine clone, binaries, captures
+spike-kaiju/
+
+# Build output
+/noisefloor
+*.spv.tmp
