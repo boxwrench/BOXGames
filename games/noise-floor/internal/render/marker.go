@@ -10,16 +10,26 @@ import (
 	"kaijuengine.com/rendering/textures"
 )
 
+// Marker is a flat colored quad bound to a transform it does not own. It is a
+// placeholder stand-in until real sprites land in Task 6.
+type Marker struct {
+	shaderData *shader_data_registry.ShaderDataUnlit
+}
+
+// SetColor recolors the marker. The player uses this to stay legible as the
+// page inverts from cream to ink — spec §10 risk 1 in its cheapest form.
+func (m *Marker) SetColor(c matrix.Color) { m.shaderData.Color = c }
+
 // NewMarker registers a flat colored quad drawn at t, sized size x size world
-// units. It is a placeholder stand-in until real sprites land in Task 6.
-func NewMarker(host *engine.Host, t *matrix.Transform, size float32, c matrix.Color) error {
+// units.
+func NewMarker(host *engine.Host, t *matrix.Transform, size float32, c matrix.Color) (*Marker, error) {
 	mat, err := host.MaterialCache().Material("unlit.material")
 	if err != nil {
-		return fmt.Errorf("render: loading unlit.material: %w", err)
+		return nil, fmt.Errorf("render: loading unlit.material: %w", err)
 	}
 	tex, err := host.TextureCache().Texture("square.png", textures.TextureFilterLinear)
 	if err != nil {
-		return fmt.Errorf("render: loading fallback texture: %w", err)
+		return nil, fmt.Errorf("render: loading fallback texture: %w", err)
 	}
 	mat = mat.CreateInstance([]*rendering.Texture{tex})
 
@@ -28,7 +38,7 @@ func NewMarker(host *engine.Host, t *matrix.Transform, size float32, c matrix.Co
 	// docs/KAIJU-NOTES.md.
 	sd, ok := shader_data_registry.Create(mat.Shader.DrawInstanceDataName()).(*shader_data_registry.ShaderDataUnlit)
 	if !ok {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"render: unlit resolved instance data %q, want \"unlit\"; check DrawInstanceData in the shader descriptor",
 			mat.Shader.DrawInstanceDataName())
 	}
@@ -44,5 +54,5 @@ func NewMarker(host *engine.Host, t *matrix.Transform, size float32, c matrix.Co
 		Transform:  t,
 		ViewCuller: &host.Cameras.Primary,
 	})
-	return nil
+	return &Marker{shaderData: sd}, nil
 }
