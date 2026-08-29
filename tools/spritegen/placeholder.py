@@ -54,14 +54,20 @@ def _canvas():
     return Image.new("RGBA", (FRAME, FRAME), (0, 0, 0, 0))
 
 
-def _centered_square(t):
-    """Player marker: a square, pulsing slightly frame to frame."""
+def _player_chevron(t):
+    """Player marker: a tall, narrow upward-pointing arrowhead, pulsing slightly frame to frame."""
     img = _canvas()
     d = ImageDraw.Draw(img)
-    side = 16 + 2 * math.sin(t * math.pi / 2)  # ~14..18px pulse
-    half = side / 2
-    cx = cy = FRAME / 2
-    d.rectangle([cx - half, cy - half, cx + half, cy + half], fill=INK)
+    cx, cy = FRAME / 2, FRAME / 2
+    # Tall narrow triangle pointing up
+    height = 12 + 1.2 * math.sin(t * math.pi / 2)  # ~10.8..13.2px pulse
+    width = 5 + 0.5 * math.sin(t * math.pi / 2)    # ~4.5..5.5px pulse
+    pts = [
+        (cx, cy - height),          # top point
+        (cx + width, cy + height),  # bottom-right
+        (cx - width, cy + height),  # bottom-left
+    ]
+    d.polygon(pts, fill=INK)
     return img
 
 
@@ -142,7 +148,7 @@ def _overfit(t):
 # name -> per-frame drawing function. Names match the actor archetypes
 # (games/noise-floor/internal/actor/doc.go) plus "player".
 ARCHETYPES = {
-    "player": _centered_square,
+    "player": _player_chevron,
     "mote": _mote,
     "dendrite": _dendrite,
     "aberrant": _aberrant,
