@@ -9,16 +9,14 @@ import (
 	"os"
 	"reflect"
 
+	"boxwrench.dev/boxgames/games/noisefloor/internal/arena"
 	"boxwrench.dev/boxgames/shared/kaijuboot"
-	"boxwrench.dev/boxgames/shared/palette"
 
 	"kaijuengine.com/bootstrap"
 	"kaijuengine.com/engine"
 	"kaijuengine.com/engine/assets"
 	_ "kaijuengine.com/engine/ui/markup/css/properties" // registers CSS property handlers
 	_ "kaijuengine.com/engine_entity_data/content_id"   // registers content ids
-	"kaijuengine.com/matrix"
-	"kaijuengine.com/rendering"
 )
 
 // Content paths are relative to the working directory, which is the game
@@ -31,7 +29,8 @@ const (
 
 // Game implements bootstrap.GameInterface.
 type Game struct {
-	host *engine.Host
+	host  *engine.Host
+	arena *arena.Arena
 }
 
 // ContentDatabase layers this game's content over the engine's synced stock
@@ -48,22 +47,13 @@ func (Game) PluginRegistry() []reflect.Type { return []reflect.Type{} }
 // so every system must add its own update here.
 func (g *Game) Launch(host *engine.Host) {
 	g.host = host
-
-	// The light key is load-bearing (design spec §2): the clean field is the
-	// play area and ink is death, so the clear color is the paper token rather
-	// than a neutral background.
-	host.RunOnRenderThread(func(device *rendering.GPUDevice) {
-		device.SetSwapChainClearColor(palette.Paper())
-	})
-
-	// Fixed single-screen arena: the camera never scrolls, so every sprite sits
-	// at a known scale.
-	host.Cameras.Primary.Camera.SetPositionAndLookAt(
-		matrix.NewVec3(0, 0, 14),
-		matrix.NewVec3(0, 0, 0),
-	)
-
-	slog.Info("NOISE FLOOR launched — scaffold only, no systems wired yet")
+	a, err := arena.New(host)
+	if err != nil {
+		slog.Error("noisefloor: failed to build the arena", "error", err)
+		os.Exit(1)
+	}
+	g.arena = a
+	slog.Info("NOISE FLOOR launched")
 }
 
 func main() {
