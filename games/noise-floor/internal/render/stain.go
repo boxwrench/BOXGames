@@ -12,6 +12,12 @@ import (
 	"kaijuengine.com/rendering/textures"
 )
 
+// StainDepth is the world z-coordinate at which the stain quad is drawn, behind
+// all gameplay sprites. Callers that need to convert gameplay-plane distances to
+// stain-plane distances (e.g., to correct for perspective depth) need this
+// constant to compute the scaling factor.
+const StainDepth = -3.0
+
 // Stain is the full-arena background quad running the boxstain shader.
 type Stain struct {
 	shaderData *shader_data_registry.ShaderDataUnlit
@@ -47,7 +53,7 @@ func NewStain(host *engine.Host, width, height float32) (*Stain, error) {
 	sd.UVs = matrix.NewVec4(0, 0, 1, 1)
 
 	e := engine.NewEntity(host.WorkGroup())
-	e.Transform.SetPosition(matrix.NewVec3(0, 0, -3)) // behind all gameplay sprites
+	e.Transform.SetPosition(matrix.NewVec3(0, 0, StainDepth)) // behind all gameplay sprites
 	e.Transform.SetScale(matrix.NewVec3(width, height, 1))
 
 	host.Drawings.AddDrawing(rendering.Drawing{

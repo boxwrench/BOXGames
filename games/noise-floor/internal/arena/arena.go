@@ -34,6 +34,15 @@ const (
 	playerSize    = 0.6
 )
 
+// stainPlaneRadius converts a gameplay-plane radius into the radius that, drawn
+// on the stain quad's plane, covers the same screen area under the perspective
+// camera. The stain plane is at a different depth than the gameplay plane, so
+// the same world distance appears at a different screen size depending on which
+// plane it is measured on.
+func stainPlaneRadius(r float32) float32 {
+	return r * (cameraZ - render.StainDepth) / cameraZ
+}
+
 type Arena struct {
 	host       *engine.Host
 	Corruption *Corruption
@@ -115,7 +124,7 @@ func (a *Arena) Update(dt float64) {
 	level := a.Corruption.Level()
 	a.receding = breathPhase(level, a.receding)
 
-	a.stain.SetBoundary(a.Corruption.SafeRadius(), level)
+	a.stain.SetBoundary(stainPlaneRadius(a.Corruption.SafeRadius()), level)
 	a.marker.SetColor(markerColor(level))
 	a.Player.Update(actor.SampleMove(&a.host.Window.Keyboard), a.Corruption, dt)
 }
