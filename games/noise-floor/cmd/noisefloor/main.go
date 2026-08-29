@@ -10,6 +10,7 @@ import (
 	"reflect"
 
 	"boxwrench.dev/boxgames/games/noisefloor/internal/arena"
+	"boxwrench.dev/boxgames/games/noisefloor/internal/debugcap"
 	"boxwrench.dev/boxgames/shared/kaijuboot"
 
 	"kaijuengine.com/bootstrap"
@@ -54,6 +55,7 @@ func (g *Game) Launch(host *engine.Host) {
 	}
 	g.arena = a
 	slog.Info("NOISE FLOOR launched")
+	debugcap.Arm(host, 30)
 }
 
 func main() {
