@@ -10,8 +10,8 @@ import (
 // than the concrete type is what keeps actor free of an import cycle.
 type fakeZone struct{ radius float32 }
 
-func (z fakeZone) SafeRadius() float32                { return z.radius }
-func (z fakeZone) Contains(p matrix.Vec2) bool        { return p.Length() <= z.radius }
+func (z fakeZone) SafeRadius() float32         { return z.radius }
+func (z fakeZone) Contains(p matrix.Vec2) bool { return p.Length() <= z.radius }
 
 func TestMoveDeltaIsZeroWithNoInput(t *testing.T) {
 	got := MoveDelta(MoveInput{}, 5, 1.0)
