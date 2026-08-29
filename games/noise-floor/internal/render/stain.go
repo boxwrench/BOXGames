@@ -32,7 +32,7 @@ func NewStain(host *engine.Host, width, height float32) (*Stain, error) {
 	mat = mat.CreateInstance([]*rendering.Texture{tex})
 
 	// The shader descriptor sets DrawInstanceData to "unlit", so this asserts
-	// to ShaderDataUnlit. If this panics, that field was lost — see
+	// to ShaderDataUnlit. If this type assertion fails, that field was lost — see
 	// docs/KAIJU-NOTES.md.
 	sd, ok := shader_data_registry.Create(mat.Shader.DrawInstanceDataName()).(*shader_data_registry.ShaderDataUnlit)
 	if !ok {

@@ -37,6 +37,9 @@ func (c *Corruption) Advance(dt float64, pressure float32) {
 	if c.radius < c.minRadius {
 		c.radius = c.minRadius
 	}
+	if c.radius > c.maxRadius {
+		c.radius = c.maxRadius
+	}
 }
 
 // Recede washes the page back toward cream, used on wave clear.

@@ -55,9 +55,25 @@ func TestSampleMoveOpposingKeysCancel(t *testing.T) {
 	}
 }
 
+func TestSampleMoveVerticalOpposingKeysCancel(t *testing.T) {
+	got := SampleMove(fakeKeys{hid.KeyboardKeyW: true, hid.KeyboardKeyS: true})
+	if got.Y != 0 {
+		t.Fatalf("W+S held gave Y=%v, want 0", got.Y)
+	}
+}
+
 func TestSampleMoveDiagonal(t *testing.T) {
 	got := SampleMove(fakeKeys{hid.KeyboardKeyW: true, hid.KeyboardKeyD: true})
 	if got.X != 1 || got.Y != 1 {
 		t.Fatalf("W+D gave %+v, want {X:1 Y:1}", got)
+	}
+}
+
+func TestSampleMoveWASDAndArrowKeysDoNotStack(t *testing.T) {
+	// W and Up arrow drive the same axis; holding both should produce the same
+	// result as holding one, not double it.
+	got := SampleMove(fakeKeys{hid.KeyboardKeyW: true, hid.KeyboardKeyUp: true})
+	if got.X != 0 || got.Y != 1 {
+		t.Fatalf("W+Up gave %+v, want {X:0 Y:1}", got)
 	}
 }

@@ -94,3 +94,36 @@ func TestResetRestoresCleanPage(t *testing.T) {
 			c.SafeRadius(), c.Level())
 	}
 }
+
+func TestAdvanceWithNegativePressureClampsAtMaxRadius(t *testing.T) {
+	c := NewCorruption(10, 2)
+	// First shrink from max
+	c.Advance(1.0, 1.0)
+	shrunk := c.SafeRadius()
+	if shrunk >= 10 {
+		t.Fatalf("initial Advance failed; radius=%v, want < 10", shrunk)
+	}
+	// Negative pressure tries to grow radius past maxRadius
+	c.Advance(5.0, -1.0)
+	if got := c.SafeRadius(); got > 10 {
+		t.Fatalf("negative pressure grew radius past maxRadius: %v, want <= 10", got)
+	}
+	if got := c.SafeRadius(); got != 10 {
+		t.Fatalf("SafeRadius() = %v, want exactly 10 (clamped at max)", got)
+	}
+}
+
+func TestLevelGuardOnZeroSpan(t *testing.T) {
+	c := NewCorruption(5, 5) // maxRadius == minRadius
+	if got := c.Level(); got != 0 {
+		t.Fatalf("Level() with zero span = %v, want 0 (guard branch)", got)
+	}
+}
+
+func TestContainsAtExactBoundary(t *testing.T) {
+	c := NewCorruption(10, 2)
+	// Point at exactly the radius should be contained
+	if !c.Contains(matrix.NewVec2(10, 0)) {
+		t.Fatal("point at exactly SafeRadius() must be contained")
+	}
+}
