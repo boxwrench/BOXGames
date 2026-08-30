@@ -53,30 +53,30 @@ func TestBreathCycleCompletesBothDirections(t *testing.T) {
 	}
 }
 
-func TestMarkerColorInvertsWithCorruption(t *testing.T) {
+func TestActorColorInvertsWithCorruption(t *testing.T) {
 	ink, paper := palette.Ink(), palette.Paper()
 
-	if got := markerColor(0); got.R() != ink.R() || got.G() != ink.G() || got.B() != ink.B() {
-		t.Fatalf("markerColor(0) = %v, want ink %v: player must be dark on a cream page", got, ink)
+	if got := actorColor(0); got.R() != ink.R() || got.G() != ink.G() || got.B() != ink.B() {
+		t.Fatalf("actorColor(0) = %v, want ink %v: actors must be dark on a cream page", got, ink)
 	}
-	if got := markerColor(1); got.R() != paper.R() || got.G() != paper.G() || got.B() != paper.B() {
-		t.Fatalf("markerColor(1) = %v, want paper %v: player must be light on an ink page", got, paper)
+	if got := actorColor(1); got.R() != paper.R() || got.G() != paper.G() || got.B() != paper.B() {
+		t.Fatalf("actorColor(1) = %v, want paper %v: actors must be light on an ink page", got, paper)
 	}
 
-	// Midway must sit strictly between the two, or the player passes through a
+	// Midway must sit strictly between the two, or an actor passes through a
 	// value that matches the ground and vanishes.
-	mid := markerColor(0.5)
+	mid := actorColor(0.5)
 	if !(mid.R() > ink.R() && mid.R() < paper.R()) {
-		t.Fatalf("markerColor(0.5).R = %v, want strictly between %v and %v", mid.R(), ink.R(), paper.R())
+		t.Fatalf("actorColor(0.5).R = %v, want strictly between %v and %v", mid.R(), ink.R(), paper.R())
 	}
 }
 
-func TestMarkerColorClampsOutOfRange(t *testing.T) {
+func TestActorColorClampsOutOfRange(t *testing.T) {
 	ink, paper := palette.Ink(), palette.Paper()
-	if got := markerColor(-5); got.R() != ink.R() {
-		t.Fatalf("markerColor(-5).R = %v, want ink %v", got.R(), ink.R())
+	if got := actorColor(-5); got.R() != ink.R() {
+		t.Fatalf("actorColor(-5).R = %v, want ink %v", got.R(), ink.R())
 	}
-	if got := markerColor(5); got.R() != paper.R() {
-		t.Fatalf("markerColor(5).R = %v, want paper %v", got.R(), paper.R())
+	if got := actorColor(5); got.R() != paper.R() {
+		t.Fatalf("actorColor(5).R = %v, want paper %v", got.R(), paper.R())
 	}
 }

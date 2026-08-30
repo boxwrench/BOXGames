@@ -2,10 +2,13 @@ package arena
 
 import (
 	"fmt"
+	"math/rand"
 
 	"boxwrench.dev/boxgames/games/noisefloor/internal/actor"
+	"boxwrench.dev/boxgames/games/noisefloor/internal/horde"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
 	"boxwrench.dev/boxgames/shared/palette"
+	"boxwrench.dev/boxgames/shared/spritesheet"
 
 	"kaijuengine.com/engine"
 	"kaijuengine.com/matrix"
@@ -51,6 +54,13 @@ type Arena struct {
 	marker     *render.Marker
 	receding   bool
 	updateID   engine.UpdateId
+
+	spawner    *horde.Spawner
+	rng        *rand.Rand
+	spriteSets map[actor.Archetype]*render.SpriteSet
+	atlases    map[actor.Archetype]*spritesheet.Atlas
+	enemyViews []enemyView
+	spawnTimer float64
 }
 
 // breathPhase decides whether the demo loop should be washing the page back
@@ -64,10 +74,13 @@ func breathPhase(level float32, receding bool) bool {
 	return level >= 1
 }
 
-// markerColor keeps the player legible as the ground inverts: ink on cream at
-// level 0, cream on ink at level 1. This is spec §10 risk 1 (horde value
-// treatment) in its cheapest possible form, for the player only.
-func markerColor(level float32) matrix.Color {
+// actorColor keeps every actor -- the player marker and every enemy sprite --
+// legible as the ground inverts: ink on cream at level 0, cream on ink at
+// level 1. This is spec §10 risk 1 (horde value treatment), applied
+// uniformly to the player and the horde by deliberate project decision: the
+// placeholder art gives player and enemies the same value range and relies
+// on silhouette alone to tell them apart.
+func actorColor(level float32) matrix.Color {
 	if level < 0 {
 		level = 0
 	} else if level > 1 {
@@ -109,6 +122,10 @@ func New(host *engine.Host) (*Arena, error) {
 	}
 	a.marker = marker
 
+	if err := a.buildHorde(host); err != nil {
+		return nil, err
+	}
+
 	a.updateID = host.Updater.AddUpdate(a.Update)
 	return a, nil
 }
@@ -125,6 +142,8 @@ func (a *Arena) Update(dt float64) {
 	a.receding = breathPhase(level, a.receding)
 
 	a.stain.SetBoundary(stainPlaneRadius(a.Corruption.SafeRadius()), level)
-	a.marker.SetColor(markerColor(level))
+	a.marker.SetColor(actorColor(level))
 	a.Player.Update(actor.SampleMove(&a.host.Window.Keyboard), a.Corruption, dt)
+
+	a.updateHorde(dt, level)
 }
