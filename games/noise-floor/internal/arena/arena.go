@@ -35,6 +35,18 @@ const (
 	safeRadiusMin = 1.5
 	playerSpeed   = 4.5
 	playerSize    = 0.6
+
+	// playerTextureKey is the player's atlas image key in the content
+	// database (see games/noise-floor/assets/sheets), mirroring
+	// archetypeTextureKey for enemies.
+	playerTextureKey = "player.png"
+
+	// actorTintBand is the distance, on either side of the safe boundary,
+	// over which an actor's tint crossfades between ink and paper. It
+	// matches the stain shader's front softness (assets/shaders/src/boxstain.frag)
+	// so an actor finishes inverting over roughly the same distance the
+	// ground beneath it takes to change.
+	actorTintBand float32 = 0.6
 )
 
 // stainPlaneRadius converts a gameplay-plane radius into the radius that, drawn
@@ -47,13 +59,14 @@ func stainPlaneRadius(r float32) float32 {
 }
 
 type Arena struct {
-	host       *engine.Host
-	Corruption *Corruption
-	Player     *actor.Player
-	stain      *render.Stain
-	marker     *render.Marker
-	receding   bool
-	updateID   engine.UpdateId
+	host           *engine.Host
+	Corruption     *Corruption
+	Player         *actor.Player
+	stain          *render.Stain
+	playerSprite   *render.Sprite
+	playerAnimator *spritesheet.Animator
+	receding       bool
+	updateID       engine.UpdateId
 
 	spawner    *horde.Spawner
 	rng        *rand.Rand
@@ -74,23 +87,32 @@ func breathPhase(level float32, receding bool) bool {
 	return level >= 1
 }
 
-// actorColor keeps every actor -- the player marker and every enemy sprite --
-// legible as the ground inverts: ink on cream at level 0, cream on ink at
-// level 1. This is spec §10 risk 1 (horde value treatment), applied
-// uniformly to the player and the horde by deliberate project decision: the
-// placeholder art gives player and enemies the same value range and relies
-// on silhouette alone to tell them apart.
-func actorColor(level float32) matrix.Color {
-	if level < 0 {
-		level = 0
-	} else if level > 1 {
-		level = 1
+// actorColor returns the tint that keeps an actor legible against the ground
+// it is standing on: ink on clean paper inside the safe zone, paper on ink
+// outside it, crossfading across the boundary. Spec 3.2 - the horde value
+// treatment - and it applies to the player for the same reason.
+//
+// The ground under any actor is determined by that actor's own distance from
+// the centre, not by the global corruption level: the corruption shader
+// paints clean paper inside SafeRadius() and ink outside it, so an actor's
+// own position is what decides which ground it is standing on.
+func actorColor(pos matrix.Vec2, safeRadius float32) matrix.Color {
+	dist := pos.Length()
+	inner := safeRadius - actorTintBand
+	outer := safeRadius + actorTintBand
+
+	t := (dist - inner) / (outer - inner)
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
 	}
+
 	ink, paper := palette.Ink(), palette.Paper()
 	return matrix.NewColor(
-		ink.R()+(paper.R()-ink.R())*level,
-		ink.G()+(paper.G()-ink.G())*level,
-		ink.B()+(paper.B()-ink.B())*level,
+		ink.R()+(paper.R()-ink.R())*t,
+		ink.G()+(paper.G()-ink.G())*t,
+		ink.B()+(paper.B()-ink.B())*t,
 		1,
 	)
 }
@@ -116,11 +138,25 @@ func New(host *engine.Host) (*Arena, error) {
 		stain:      stain,
 	}
 
-	marker, err := render.NewMarker(host, &a.Player.Entity.Transform, playerSize, palette.Ink())
+	sidecar, err := host.AssetDatabase().Read(playerTextureKey + ".json")
 	if err != nil {
-		return nil, fmt.Errorf("arena: creating player marker: %w", err)
+		return nil, fmt.Errorf("arena: reading sheet sidecar for player (%s.json): %w", playerTextureKey, err)
 	}
-	a.marker = marker
+	atlas, err := spritesheet.LoadAtlas(sidecar)
+	if err != nil {
+		return nil, fmt.Errorf("arena: loading atlas for player: %w", err)
+	}
+	sprite, err := render.NewSprite(host, playerTextureKey, playerSize)
+	if err != nil {
+		return nil, fmt.Errorf("arena: creating player sprite: %w", err)
+	}
+	animator := spritesheet.NewAnimator(atlas)
+	if err := animator.Play("idle"); err != nil {
+		return nil, fmt.Errorf("arena: player atlas has no idle clip: %w", err)
+	}
+	sprite.Show()
+	a.playerSprite = sprite
+	a.playerAnimator = animator
 
 	if err := a.buildHorde(host); err != nil {
 		return nil, err
@@ -142,8 +178,12 @@ func (a *Arena) Update(dt float64) {
 	a.receding = breathPhase(level, a.receding)
 
 	a.stain.SetBoundary(stainPlaneRadius(a.Corruption.SafeRadius()), level)
-	a.marker.SetColor(actorColor(level))
 	a.Player.Update(actor.SampleMove(&a.host.Window.Keyboard), a.Corruption, dt)
 
-	a.updateHorde(dt, level)
+	a.playerAnimator.Update(dt)
+	a.playerSprite.SetPosition(a.Player.Position())
+	a.playerSprite.SetUVs(a.playerAnimator.UVs())
+	a.playerSprite.SetColor(actorColor(a.Player.Position(), a.Corruption.SafeRadius()))
+
+	a.updateHorde(dt)
 }

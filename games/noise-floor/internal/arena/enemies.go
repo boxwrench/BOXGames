@@ -148,7 +148,7 @@ func (a *Arena) buildHorde(host *engine.Host) error {
 
 // updateHorde advances the temporary spawn cadence, then steers, animates
 // and redraws every live enemy for this frame.
-func (a *Arena) updateHorde(dt float64, level float32) {
+func (a *Arena) updateHorde(dt float64) {
 	a.spawnTimer += dt
 	if shouldSpawn(a.spawnTimer, spawnInterval, a.spawner.Live(), maxLiveEnemies) {
 		a.spawnTimer -= spawnInterval
@@ -157,7 +157,7 @@ func (a *Arena) updateHorde(dt float64, level float32) {
 	}
 
 	target := a.Player.Position()
-	color := actorColor(level)
+	safeRadius := a.Corruption.SafeRadius()
 	a.spawner.Each(func(handle int, e *horde.Enemy) {
 		view := &a.enemyViews[handle]
 
@@ -173,7 +173,7 @@ func (a *Arena) updateHorde(dt float64, level float32) {
 		view.animator.Update(dt)
 		view.sprite.SetPosition(e.Pos)
 		view.sprite.SetUVs(view.animator.UVs())
-		view.sprite.SetColor(color)
+		view.sprite.SetColor(actorColor(e.Pos, safeRadius))
 	})
 }
 
@@ -205,5 +205,5 @@ func (a *Arena) spawnEnemy(arch actor.Archetype) {
 	a.enemyViews[handle] = enemyView{sprite: sprite, animator: animator, entered: false}
 	sprite.SetPosition(enemy.Pos)
 	sprite.SetUVs(animator.UVs())
-	sprite.SetColor(actorColor(a.Corruption.Level()))
+	sprite.SetColor(actorColor(enemy.Pos, a.Corruption.SafeRadius()))
 }

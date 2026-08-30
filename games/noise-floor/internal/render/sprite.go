@@ -17,9 +17,9 @@ import (
 const SpriteDepth = 0.1
 
 // Sprite is one atlas-textured quad with its own entity and transform, drawn
-// in the XY plane. Unlike Marker, which is bound to a transform it does not
-// own, a Sprite owns its entity so each pooled instance (e.g. one per live
-// enemy) can be positioned independently.
+// in the XY plane. It owns its entity so each instance (e.g. one per live
+// enemy, or the single permanent player sprite) can be positioned
+// independently.
 type Sprite struct {
 	entity     *engine.Entity
 	shaderData *shader_data_registry.ShaderDataUnlit
