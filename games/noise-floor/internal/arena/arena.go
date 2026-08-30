@@ -2,10 +2,13 @@ package arena
 
 import (
 	"fmt"
+	"math/rand"
 
 	"boxwrench.dev/boxgames/games/noisefloor/internal/actor"
+	"boxwrench.dev/boxgames/games/noisefloor/internal/horde"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
 	"boxwrench.dev/boxgames/shared/palette"
+	"boxwrench.dev/boxgames/shared/spritesheet"
 
 	"kaijuengine.com/engine"
 	"kaijuengine.com/matrix"
@@ -17,24 +20,105 @@ import (
 // world units at 16:9. The stain quad sits at z=-3 where the frustum is ~34.9x19.6.
 // The quad is deliberately oversized to 48x22 so it bleeds past the frustum at
 // every aspect ratio out to 2.45:1, covering the screen with a single quad.
+//
+// safeRadiusMax is calibrated to that framing, not chosen freely: it is the
+// gameplay-plane half-height, cameraZ * tan(30 deg) with a 60 deg vertical
+// FOV (~8.08, rounded to 8.1). The safe circle therefore touches the top and
+// bottom screen edges, and a clean page starts with only the four corners
+// inked. TestSafeRadiusMaxMatchesGameplayPlaneHalfHeight enforces this pair
+// stays calibrated.
 const (
 	cameraZ       = 14.0
 	stainWidth    = 48.0
 	stainHeight   = 22.0
-	safeRadiusMax = 6.5
+	safeRadiusMax = 8.1
 	safeRadiusMin = 1.5
 	playerSpeed   = 4.5
 	playerSize    = 0.6
+
+	// playerTextureKey is the player's atlas image key in the content
+	// database (see games/noise-floor/assets/sheets).
+	playerTextureKey = "player.png"
+
+	// stainFrontSoftness MUST match FRONT_SOFTNESS in
+	// assets/shaders/src/boxstain.frag: the width, in stain-plane world
+	// units, of the shader's corruption-front ramp. GLSL cannot be imported
+	// into Go, so this is a hand-kept duplicate -- the same situation
+	// shared/palette is in with its own copies of the shader's color
+	// literals, which it guards with a tripwire test (palette_test.go's
+	// TestShaderPaletteSync). TestActorTintBandMatchesShaderFrontSoftness
+	// below does the same job for this constant: if it ever fails, update
+	// whichever of this constant or FRONT_SOFTNESS has drifted from the
+	// other.
+	stainFrontSoftness = 0.6
+
+	// actorTintBand is the distance beyond the safe boundary over which an
+	// actor's tint crossfades from ink to paper. It is stainFrontSoftness
+	// converted from stain-plane units to gameplay-plane units by the
+	// inverse of stainPlaneRadius's scaling, so an actor finishes inverting
+	// over exactly the on-screen distance the ground beneath it takes to
+	// change. The ramp itself is one-sided to match the shader's
+	// smoothstep(front, front+FRONT_SOFTNESS, r): full ink right up to the
+	// boundary, crossfading to paper only in the band outward from it -- see
+	// actorColor.
+	actorTintBand float32 = stainFrontSoftness * cameraZ / (cameraZ - render.StainDepth)
 )
 
+// stainPlaneRadius converts a gameplay-plane radius into the radius that, drawn
+// on the stain quad's plane, covers the same screen area under the perspective
+// camera. The stain plane is at a different depth than the gameplay plane, so
+// the same world distance appears at a different screen size depending on which
+// plane it is measured on.
+func stainPlaneRadius(r float32) float32 {
+	return r * (cameraZ - render.StainDepth) / cameraZ
+}
+
 type Arena struct {
-	host       *engine.Host
-	Corruption *Corruption
-	Player     *actor.Player
-	stain      *render.Stain
-	marker     *render.Marker
-	receding   bool
-	updateID   engine.UpdateId
+	host           *engine.Host
+	Corruption     *Corruption
+	Player         *actor.Player
+	stain          *render.Stain
+	playerSprite   *render.Sprite
+	playerAnimator *spritesheet.Animator
+	receding       bool
+	updateID       engine.UpdateId
+
+	spawner    *horde.Spawner
+	rng        *rand.Rand
+	spriteSets map[actor.Archetype]spriteBank
+	atlases    map[actor.Archetype]*spritesheet.Atlas
+	enemyViews []enemyView
+	spawnTimer float64
+}
+
+// loadActorAtlas reads a sprite sheet's sidecar from the content database and
+// parses it. textureKey is the atlas image name in the content database
+// (e.g. "mote.png"); label identifies the caller in error text (e.g.
+// "player", or an archetype's Name()). Both the player bootstrap below and
+// enemies.go's buildHorde use this so their error wording cannot drift.
+func loadActorAtlas(host *engine.Host, textureKey, label string) (*spritesheet.Atlas, error) {
+	sidecar, err := host.AssetDatabase().Read(textureKey + ".json")
+	if err != nil {
+		return nil, fmt.Errorf("arena: reading sheet sidecar for %s (%s.json): %w", label, textureKey, err)
+	}
+	atlas, err := spritesheet.LoadAtlas(sidecar)
+	if err != nil {
+		return nil, fmt.Errorf("arena: loading atlas for %s: %w", label, err)
+	}
+	return atlas, nil
+}
+
+// newIdleAnimator creates an animator over atlas and starts its "idle" clip.
+// label identifies the caller in error text. Used both by the player
+// bootstrap below (once, at startup) and by enemies.go's spawnEnemy (once
+// per spawn, since each live enemy needs its own animator state) so their
+// error wording cannot drift.
+func newIdleAnimator(atlas *spritesheet.Atlas, label string) (*spritesheet.Animator, error) {
+	animator := spritesheet.NewAnimator(atlas)
+	if err := animator.Play("idle"); err != nil {
+		return nil, fmt.Errorf("arena: %s atlas has no idle clip: %w", label, err)
+	}
+	return animator, nil
 }
 
 // breathPhase decides whether the demo loop should be washing the page back
@@ -48,20 +132,37 @@ func breathPhase(level float32, receding bool) bool {
 	return level >= 1
 }
 
-// markerColor keeps the player legible as the ground inverts: ink on cream at
-// level 0, cream on ink at level 1. This is spec §10 risk 1 (horde value
-// treatment) in its cheapest possible form, for the player only.
-func markerColor(level float32) matrix.Color {
-	if level < 0 {
-		level = 0
-	} else if level > 1 {
-		level = 1
+// actorColor returns the tint that keeps an actor legible against the ground
+// it is standing on: ink on clean paper inside the safe zone, paper on ink
+// outside it, crossfading across the boundary. Spec 3.2 - the horde value
+// treatment - and it applies to the player for the same reason.
+//
+// The ground under any actor is determined by that actor's own distance from
+// the centre, not by the global corruption level: the corruption shader
+// paints clean paper inside SafeRadius() and ink outside it, so an actor's
+// own position is what decides which ground it is standing on.
+//
+// The ramp is one-sided, matching the shader's own
+// smoothstep(front, front+FRONT_SOFTNESS, r): an actor is fully ink right up
+// to and including the boundary itself (dist <= safeRadius), then crossfades
+// to fully paper over actorTintBand beyond it (dist >= safeRadius+
+// actorTintBand). A symmetric, two-sided ramp centred on the boundary would
+// start inverting an actor before the ground under it has changed at all.
+func actorColor(pos matrix.Vec2, safeRadius float32) matrix.Color {
+	dist := pos.Length()
+
+	t := (dist - safeRadius) / actorTintBand
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
 	}
+
 	ink, paper := palette.Ink(), palette.Paper()
 	return matrix.NewColor(
-		ink.R()+(paper.R()-ink.R())*level,
-		ink.G()+(paper.G()-ink.G())*level,
-		ink.B()+(paper.B()-ink.B())*level,
+		ink.R()+(paper.R()-ink.R())*t,
+		ink.G()+(paper.G()-ink.G())*t,
+		ink.B()+(paper.B()-ink.B())*t,
 		1,
 	)
 }
@@ -87,11 +188,25 @@ func New(host *engine.Host) (*Arena, error) {
 		stain:      stain,
 	}
 
-	marker, err := render.NewMarker(host, &a.Player.Entity.Transform, playerSize, palette.Ink())
+	atlas, err := loadActorAtlas(host, playerTextureKey, "player")
 	if err != nil {
-		return nil, fmt.Errorf("arena: creating player marker: %w", err)
+		return nil, err
 	}
-	a.marker = marker
+	sprite, err := render.NewSprite(host, playerTextureKey, playerSize)
+	if err != nil {
+		return nil, fmt.Errorf("arena: creating player sprite: %w", err)
+	}
+	animator, err := newIdleAnimator(atlas, "player")
+	if err != nil {
+		return nil, err
+	}
+	sprite.Show()
+	a.playerSprite = sprite
+	a.playerAnimator = animator
+
+	if err := a.buildHorde(host); err != nil {
+		return nil, err
+	}
 
 	a.updateID = host.Updater.AddUpdate(a.Update)
 	return a, nil
@@ -108,7 +223,13 @@ func (a *Arena) Update(dt float64) {
 	level := a.Corruption.Level()
 	a.receding = breathPhase(level, a.receding)
 
-	a.stain.SetLevel(level)
-	a.marker.SetColor(markerColor(level))
+	a.stain.SetBoundary(stainPlaneRadius(a.Corruption.SafeRadius()), level)
 	a.Player.Update(actor.SampleMove(&a.host.Window.Keyboard), a.Corruption, dt)
+
+	a.playerAnimator.Update(dt)
+	a.playerSprite.SetPosition(a.Player.Position())
+	a.playerSprite.SetUVs(a.playerAnimator.UVs())
+	a.playerSprite.SetColor(actorColor(a.Player.Position(), a.Corruption.SafeRadius()))
+
+	a.updateHorde(dt)
 }
