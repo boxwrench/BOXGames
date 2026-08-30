@@ -1,6 +1,6 @@
 # Where things stand
 
-Last updated: 2026-08-29 (after gameplay tasks 1–5, branch reviewed and complete). Update this when the state below stops being true.
+Last updated: 2026-08-29 (after gameplay tasks 1–7, both branches merged to main). Update this when the state below stops being true.
 
 ## Cold start
 
@@ -23,12 +23,12 @@ Verified from an empty environment (`env -i`, no `PATH` additions, no
 | --- | --- |
 | Monorepo scaffold, workspace, build scripts | Working |
 | `make bootstrap / build / run / test / vet / fmt / clean` | Working |
-| NOISE FLOOR binary | First playable **on `feat/noise-floor-gameplay`, not `main`**. Paper field with grain, corruption model, BX-77 as a placeholder ink square under WASD. No enemies, weapons, or waves. |
+| NOISE FLOOR binary | Playable. Cream page, a corruption boundary that eats inward and matches the gameplay boundary exactly, BX-77 under WASD, and five enemy archetypes spawning out of the ink and walking in. No weapons, damage, death, or waves yet. |
 | `shared/palette`, `shared/pool` | Implemented, tested |
 | `shared/kaijuboot` layered content database | Implemented |
-| `shared/spritesheet` | Tests only — they pin engine limitations. No implementation yet. |
+| `shared/spritesheet` | Implemented: sheet schema, atlas loader, UV conversion, per-entity animator. Replaces the engine's broken sprite path. |
 | `shared/juice` | Empty, doc only |
-| `tools/spritegen` | Plan only, no code |
+| `tools/spritegen` | Plan, plus `placeholder.py` generating the white silhouette atlases. No ComfyUI pipeline yet. |
 
 `make test` passes, and the suite is clean under `-race`.
 
@@ -50,63 +50,60 @@ and ALSA headers).
 
 ### Where the work lives
 
-Gameplay tasks 1–5, plus two follow-ups, are on branch
-**`feat/noise-floor-gameplay`** — 11 commits off `dc1489d`, **not merged to
-`main`**. Every task was independently reviewed, the whole branch passed a final
-review, and the test suite is clean under `-race`.
-
-| Commit | What |
-| --- | --- |
-| `81f4b1c` | `arena.Corruption` — CPU-authoritative shrinking boundary |
-| `53ab871` | `actor.Player` — movement, safe-zone clamping |
-| `9817524` | `actor.SampleMove` — WASD/arrow input sampling |
-| `d44e174` | `boxstain` shader, shader + material descriptors |
-| `4dfc732` | arena assembly — first playable |
-| `23d5e48` | stain quad geometry fix (frustum coverage) |
-| `de23fa1` | `debugcap` — GPU screenshot hook |
-| `84bdd51` | `make fmt` fix, player marker, configurable capture frames |
-| `af63444` | final review fixes (clamp, tests, palette tripwire) |
+All of it is on `main`. Two branches were merged: `feat/noise-floor-gameplay`
+(plan tasks 1–5, the first playable) and `feat/boundary-calibration`
+(boundary calibration, sprites, enemies).
 
 Iteration notes for the next demo: [DEMO-NOTES.md](DEMO-NOTES.md).
 
-### Blocking prerequisite before Task 7
+### Two blocking prerequisites, each attached to the task it blocks
 
-**The visual stain front and `SafeRadius()` are not calibrated to each other.**
-Found by the whole-branch review; no per-task review could see it, because the
-shader task and the arena task were each correct alone.
+These came out of whole-branch reviews and must not be lost — each is cheap
+now and expensive later.
 
-`safeRadiusMax = 6.5` clamps the player to roughly 45% of the visible width, so
-on launch you can hold D and stop dead in unmarked cream paper with a third of
-the screen still visibly playable. Separately, `boxstain.frag` thresholds its
-noise field in the *quad's* UV space, and the stain quad is 48×22 — anisotropic
-— so the stain front is a screen-space ellipse with no world-unit relationship
-to the boundary the CPU owns at any corruption level. Spec §5.1 promises the
-visual edge wobbles ±5% around that radius. It does not.
+**Before Task 8 (wave director): move enemy simulation into `internal/horde`.**
+Right now `internal/horde` owns only a pool wrapper, and *all* enemy simulation
+— steering dispatch, integration, safe-zone clamping — lives inside
+`arena.updateHorde`'s closure in `internal/arena/enemies.go`. Task 8's director
+and Task 10's damage and death have nowhere to go but that same closure. The
+decoupling seam already exists and is unused: `actor.SafeZone`. Moving
+`enemyVelocity`, the integration step and `clampArmed` into a
+`horde.Step(dt, target, zone)` leaves `enemies.go` as pure view-sync and gives
+both later tasks an obvious home. `aberrantStandoff` is archetype design data
+currently sitting in the render-wiring file for want of that seam; it moves too.
 
-Fix direction: pass the shader `SafeRadius()/quadHalfExtent` rather than
-`Level()`, and scale UV by the quad's aspect so `edge` is isotropic. Or, as a
-floor, raise `safeRadiusMax` to ~8.0 so the clamp meets the vertical screen edge.
-
-**Settle this before Task 7 (enemies).** Task 7 spawns enemies "outside the safe
-zone", which at 6.5 is still well inside the visible field — enemies would pop
-into view on clean paper, and spawn placement would have to be redone after any
-framing change. Task 8 owns corruption pressure, but the framing must be right
-first. Doing this also retires the known cosmetic defect where the shader leaves
-faint unconsumed specks at corruption level 1.
-
-Nobody has yet captured the stain at a corruption level above ~0.06, so its
-appearance mid-transition is still unobserved. Capture it before changing it.
+**Before Task 10 (damage and death): pool the animator.** `spawnEnemy`
+allocates a fresh `spritesheet.Animator` per spawn. That is bounded and harmless
+today because nothing despawns, but spec §5.2 names allocation churn and GC
+pauses during a wave as the measured risk, and death is what starts enemies
+cycling. `despawnEnemy` already exists and owns the unwind — pool the animator
+in the same change that first calls it.
 
 ### Then
 
 [`games/noise-floor/docs/plans/2026-08-29-noise-floor-gameplay.md`](../games/noise-floor/docs/plans/2026-08-29-noise-floor-gameplay.md)
-tasks 6–14. **They are specified but not expanded to step level.** Expand a task
-before executing it. The plan's task-summary list previously disagreed with its
-own expanded entries; it has been corrected, and the expanded entries own the
-requirements.
+tasks 8–14. **Specified but not expanded to step level** — expand before
+executing. Tasks 6 and 7 were expanded by hand during execution because the
+plan referenced a clip schema and a UV flip formula that did not exist, and
+gave the five enemy archetypes no numbers at all; expect the same of the rest.
 
 Same split in the art pipeline plan ([`tools/spritegen/PLAN.md`](../tools/spritegen/PLAN.md)):
 tasks 1–2 ready, 3–6 need expanding.
+
+### A binding constraint on all future sprite art
+
+**Atlases must be authored white or greyscale, never pre-coloured.** The sprite
+shader multiplies texture by tint, so a pre-coloured atlas can only ever darken
+— an ink-coloured sprite tinted toward paper stays ink. This is what the actor
+value treatment depends on, and it was found the hard way: enemies standing in
+the ink measured luminance 21.4 against ink at 22.6, invisible. With white
+atlases the same measurement is 711 against 72.
+
+This is the standard technique, not a workaround — see DEMO-NOTES.md for
+sources. It binds `tools/spritegen` and everything ComfyUI ever generates for
+this game. A related trick worth knowing: up to 3–4 independently recolourable
+regions can be packed into one greyscale texture's R/G/B/A channels, which is
+how BX-77 gets separate brass and visor accents without extra atlases.
 
 ### Seeing the game
 
@@ -114,10 +111,12 @@ External screen capture does not work here (see Risks). Use the built-in hook:
 
 ```sh
 cd games/noise-floor
-NOISEFLOOR_CAPTURE=/tmp/shot.png NOISEFLOOR_CAPTURE_FRAMES=360 ./bin/noise-floor
+NOISEFLOOR_CAPTURE=/tmp/shot.png NOISEFLOOR_CAPTURE_FRAMES=45000 ./bin/noise-floor
 ```
 
-It writes a PNG of the last presented frame and exits on its own.
+It writes a PNG of the last presented frame and exits. Frame counts are large
+because the game renders uncapped at roughly 9000fps; corruption reaches full
+ink in about 8.3 seconds of real time, so aim by wall-clock, not frames.
 
 ## Open decisions
 
@@ -128,9 +127,14 @@ It writes a PNG of the last presented frame and exits on its own.
 2. **`spike-kaiju/` is still on disk** — ~130 MB of throwaway feasibility spike
    (engine clone, binary, video capture). Gitignored and safe to delete; kept
    only because deleting it was never explicitly approved.
-3. **Horde value treatment** — how noise entities stay readable once the ground
-   inverts from cream to ink. The spec calls this the first implementation task
-   and it gates all horde art generation. Unresolved.
+3. ~~**Horde value treatment**~~ — resolved: actors crossfade ink↔paper based on
+   the ground they stand on, so they invert as the page does. Implemented for
+   both the player and the horde; closes spec §10 open risk 1.
+   **One open follow-up:** a pure value crossfade has a crossover point where an
+   actor on the boundary matches the ground. The standard fix is a 1px
+   opposite-value outline, which is complementary rather than an alternative —
+   the crossfade handles broad value match, the outline guarantees a hard edge.
+   Cheap to add in `tools/spritegen/placeholder.py`. Not yet decided.
 
 ## Risks worth knowing
 
