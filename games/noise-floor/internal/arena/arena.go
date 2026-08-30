@@ -87,19 +87,19 @@ type Arena struct {
 	spawner    *horde.Spawner
 	rng        *rand.Rand
 	spriteSets map[actor.Archetype]spriteBank
-	atlases    map[actor.Archetype]*spritesheet.Atlas
 	enemyViews []enemyView
 	spawnTimer float64
 
 	weapon              *weapon.Weapon
 	battery             *weapon.Battery
-	projectiles         *render.SpriteSet
 	projectileSprites   []*render.Sprite
 	projectileAnimators []*spritesheet.Animator
 	projectileLive      []bool
 	targets             []weapon.Target // scratch, refilled each frame -- see refillTargets
 	targetHandles       []int           // parallel to targets: targetHandles[i] is targets[i]'s pool handle
 	died                []int           // scratch, refilled each frame in resolveHits
+	hits                []weapon.Hit    // scratch, refilled each frame by weapon.Collide
+	expiredProjectiles  []int           // scratch, refilled each frame by weapon.Battery.Step
 }
 
 // loadActorAtlas reads a sprite sheet's sidecar from the content database and

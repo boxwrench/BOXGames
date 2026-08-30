@@ -28,33 +28,46 @@ func New(s Spec) *Weapon {
 // Spec returns the weapon's fixed identity.
 func (w *Weapon) Spec() Spec { return w.spec }
 
-// Ready reports whether the weapon would fire on its next Tick.
+// Ready reports whether a shot is available.
 func (w *Weapon) Ready() bool {
 	return w.timer >= w.spec.Cooldown
 }
 
-// Tick advances the cooldown and reports whether the weapon fires this
-// frame. It fires at most once per Tick regardless of how large dt is: a
-// long frame must not discharge a burst.
+// Advance accumulates elapsed time toward the next shot. It never consumes
+// it and never decides whether to fire -- call it every frame regardless of
+// whether a shot is actually taken this frame.
+//
+// This matters when no target is in range: the caller checks Ready(), finds
+// nothing to fire at, and simply does not call Consume. Because Advance by
+// itself never spends anything, that unconsumed readiness is not lost -- the
+// weapon is still ready the instant a target appears, rather than only after
+// another full Cooldown. (A single combined Tick(dt) that both accumulated
+// and consumed on every call could not make this distinction: it fired,
+// and therefore consumed, whether or not the caller actually took the
+// shot.)
+func (w *Weapon) Advance(dt float64) {
+	w.timer += dt
+}
+
+// Consume spends one shot's worth of cooldown. Call it only when a shot is
+// actually fired.
 //
 // The remainder past Cooldown is carried forward rather than dropped, so a
 // frame that overshoots does not lose the excess and the effective fire
 // rate does not drift with frame time. This mirrors the fix already made to
 // the Lancer's phase timer (actor.LancerBrain.Update).
 //
-// The carried remainder is clamped to at most one Cooldown to prevent a
-// catastrophic frame from creating a multi-frame burst; the weapon will fire
-// once and then resume its normal schedule.
-func (w *Weapon) Tick(dt float64) bool {
-	w.timer += dt
-	if w.timer < w.spec.Cooldown {
-		return false
-	}
+// The carried remainder is then clamped to at most one Cooldown. This
+// caps not just a single catastrophic-dt frame but also a long stretch
+// with no target in range: Advance may have banked far more than one
+// Cooldown's worth of credit by the time Consume finally runs, and without
+// this clamp that credit would survive the subtraction and let the weapon
+// fire again immediately, and again, for many frames -- a burst. Clamping
+// means at most one immediate make-up shot before the weapon resumes its
+// normal schedule.
+func (w *Weapon) Consume() {
 	w.timer -= w.spec.Cooldown
-	// Clamp accumulated remainder to at most one Cooldown to prevent
-	// bursting for many frames after a catastrophic frame.
 	if w.timer > w.spec.Cooldown {
 		w.timer = w.spec.Cooldown
 	}
-	return true
 }

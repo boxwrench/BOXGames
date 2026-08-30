@@ -115,7 +115,6 @@ func (a *Arena) buildHorde(host *engine.Host) error {
 	a.spawner = horde.NewSpawner(spawnerCapacity, a.rng)
 	a.enemyViews = make([]enemyView, spawnerCapacity)
 	a.spriteSets = make(map[actor.Archetype]spriteBank, len(enemyArchetypes))
-	a.atlases = make(map[actor.Archetype]*spritesheet.Atlas, len(enemyArchetypes))
 
 	for _, arch := range enemyArchetypes {
 		// The sidecar filename follows a fixed lowercase(Name())+".png"
@@ -128,7 +127,6 @@ func (a *Arena) buildHorde(host *engine.Host) error {
 		if err != nil {
 			return err
 		}
-		a.atlases[arch] = atlas
 
 		// atlas.Image, not sidecarKey, is the texture actually bound: the
 		// sidecar is the single source of truth for which image its UVs

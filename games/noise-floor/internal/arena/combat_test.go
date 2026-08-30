@@ -112,10 +112,9 @@ func TestResolveHitsKillReportsHandleDead(t *testing.T) {
 	if !ok {
 		t.Fatal("Fire failed")
 	}
-	handles := []int{h}
-	hits := []weapon.Hit{{Projectile: ph, Target: 0, Damage: 3}}
+	hits := []weapon.Hit{{Projectile: ph, TargetHandle: h, Damage: 3}}
 
-	died := resolveHits(hits, handles, []int{}, b, s)
+	died := resolveHits(hits, []int{}, b, s)
 
 	if len(died) != 1 || died[0] != h {
 		t.Fatalf("died = %v, want [%d]", died, h)
@@ -141,10 +140,9 @@ func TestResolveHitsNonLethalReportsNothing(t *testing.T) {
 	if !ok {
 		t.Fatal("Fire failed")
 	}
-	handles := []int{h}
-	hits := []weapon.Hit{{Projectile: ph, Target: 0, Damage: 3}}
+	hits := []weapon.Hit{{Projectile: ph, TargetHandle: h, Damage: 3}}
 
-	died := resolveHits(hits, handles, []int{}, b, s)
+	died := resolveHits(hits, []int{}, b, s)
 
 	if len(died) != 0 {
 		t.Fatalf("died = %v, want none (Dendrite survives 3 damage on 12 health)", died)
@@ -175,13 +173,12 @@ func TestResolveHitsSameEnemyTwiceInOneFrameDiesOnce(t *testing.T) {
 	if !ok {
 		t.Fatal("Fire 2 failed")
 	}
-	handles := []int{h}
 	hits := []weapon.Hit{
-		{Projectile: ph1, Target: 0, Damage: 3},
-		{Projectile: ph2, Target: 0, Damage: 3},
+		{Projectile: ph1, TargetHandle: h, Damage: 3},
+		{Projectile: ph2, TargetHandle: h, Damage: 3},
 	}
 
-	died := resolveHits(hits, handles, []int{}, b, s)
+	died := resolveHits(hits, []int{}, b, s)
 
 	if len(died) != 1 {
 		t.Fatalf("died = %v, want exactly one entry (reported dead once, not twice)", died)

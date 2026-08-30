@@ -95,6 +95,17 @@ func resetAnimatorForAcquire(an *spritesheet.Animator, clip string) {
 	_ = an.Play(clip)
 }
 
+// At returns the sprite and animator at positional index i directly,
+// bypassing the free list. It is for a caller that addresses a SpriteSet's
+// slots by a stable identity of its own -- e.g. a battery's pool handle --
+// rather than acquiring and releasing through Acquire/Release. Such a slot
+// is never marked live and can never be returned by Acquire or accepted by
+// Release; the caller manages its own visibility and lifetime entirely
+// (see arena.buildCombat's doc comment on projectile sprites).
+func (s *SpriteSet) At(i int) (*Sprite, *spritesheet.Animator) {
+	return s.sprites[i], s.animators[i]
+}
+
 // Release hides a sprite and returns it, and its animator, to the set.
 // Releasing a sprite this set did not hand out, or double-releasing one, is
 // ignored rather than corrupting the free list.

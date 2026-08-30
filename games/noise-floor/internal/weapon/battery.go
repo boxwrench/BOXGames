@@ -49,9 +49,12 @@ func (b *Battery) Fire(origin, target matrix.Vec2, speed float32, damage int, li
 }
 
 // Step advances every live projectile and expires those whose life runs
-// out.
-func (b *Battery) Step(dt float64) {
-	var expired []int
+// out. expired is caller-supplied scratch, reused via expired[:0]+append the
+// same way Arena's other per-frame scratch slices are, so this allocates
+// nothing once warmed up. The returned slice holds the handles expired this
+// call (thread it back in on the next call).
+func (b *Battery) Step(dt float64, expired []int) []int {
+	expired = expired[:0]
 	b.pool.Each(func(h int, p *Projectile) {
 		p.Pos = p.Pos.Add(p.Vel.Scale(float32(dt)))
 		p.Life -= dt
@@ -62,6 +65,7 @@ func (b *Battery) Step(dt float64) {
 	for _, h := range expired {
 		b.pool.Put(h)
 	}
+	return expired
 }
 
 // Each iterates live projectiles.

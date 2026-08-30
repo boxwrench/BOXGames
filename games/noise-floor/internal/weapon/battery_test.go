@@ -45,7 +45,7 @@ func TestProjectileMotionTravelsAtSpeed(t *testing.T) {
 	if !ok {
 		t.Fatal("Fire failed")
 	}
-	b.Step(1.0) // 1 second at speed 5 -> travels 5 units along +X
+	b.Step(1.0, nil) // 1 second at speed 5 -> travels 5 units along +X
 	p := b.Each
 	var pos matrix.Vec2
 	found := false
@@ -73,11 +73,11 @@ func TestProjectileExpiresWhenLifeRunsOut(t *testing.T) {
 	if b.Live() != 1 {
 		t.Fatalf("Live() = %d, want 1", b.Live())
 	}
-	b.Step(0.3)
+	b.Step(0.3, nil)
 	if b.Live() != 1 {
 		t.Fatal("projectile expired too early")
 	}
-	b.Step(0.3) // total 0.6s > 0.5s life
+	b.Step(0.3, nil) // total 0.6s > 0.5s life
 	if b.Live() != 0 {
 		t.Fatalf("Live() after life expired = %d, want 0", b.Live())
 	}
@@ -102,7 +102,7 @@ func TestProjectileDoesNotHomeOnMovingTarget(t *testing.T) {
 	}
 	// The target "moves" -- but Fire has already committed to a heading,
 	// so nothing about the projectile's future path depends on it.
-	b.Step(1.0)
+	b.Step(1.0, nil)
 	var pos matrix.Vec2
 	b.Each(func(h int, p *Projectile) {
 		if h == handle {
@@ -143,5 +143,30 @@ func TestBatteryPoolExhaustionAndDespawn(t *testing.T) {
 	_, ok = b.Fire(matrix.Vec2Zero(), matrix.NewVec2(1, 0), 1, 1, 10)
 	if !ok {
 		t.Fatal("Fire after Despawn returned ok=false, want true -- Despawn should free a slot")
+	}
+}
+
+// TestStepReturnsExpiredAndReusesScratchSlice confirms Step reports which
+// handles it expired this call (Battery.Fire's ok=false, Despawn, and
+// implicit expiry are all the caller has to know a shot is gone) and that
+// the scratch slice is reused via [:0]+append rather than reallocated -- a
+// call with nothing to expire must not leave a stale handle from the
+// previous call in the returned slice.
+func TestStepReturnsExpiredAndReusesScratchSlice(t *testing.T) {
+	b := NewBattery(4)
+	h, ok := b.Fire(matrix.Vec2Zero(), matrix.NewVec2(1, 0), 1, 1, 0.5)
+	if !ok {
+		t.Fatal("Fire failed")
+	}
+
+	scratch := make([]int, 0, 4)
+	scratch = b.Step(0.6, scratch) // 0.6s > 0.5s life -- expires
+	if len(scratch) != 1 || scratch[0] != h {
+		t.Fatalf("Step returned %v, want [%d] (the expired handle)", scratch, h)
+	}
+
+	scratch = b.Step(0.1, scratch) // nothing live, nothing expires
+	if len(scratch) != 0 {
+		t.Fatalf("Step returned %v after a call with nothing to expire, want empty (stale entry from previous call leaked through)", scratch)
 	}
 }
