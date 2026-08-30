@@ -1,6 +1,6 @@
 # Where things stand
 
-Last updated: 2026-08-29 (after gameplay tasks 1–7, both branches merged to main). Update this when the state below stops being true.
+Last updated: 2026-08-30 (after combat; three branches merged to main). Update this when the state below stops being true.
 
 ## Cold start
 
@@ -23,12 +23,12 @@ Verified from an empty environment (`env -i`, no `PATH` additions, no
 | --- | --- |
 | Monorepo scaffold, workspace, build scripts | Working |
 | `make bootstrap / build / run / test / vet / fmt / clean` | Working |
-| NOISE FLOOR binary | Playable. Cream page, a corruption boundary that eats inward and matches the gameplay boundary exactly, BX-77 under WASD, and five enemy archetypes spawning out of the ink and walking in. No weapons, damage, death, or waves yet. |
+| NOISE FLOOR binary | Playable, and now a game loop. Cream page, corruption boundary eating inward, BX-77 under WASD, five enemy archetypes walking in out of the ink, and an auto-firing weapon that kills them. ~12-14 kills per 15s with one weapon. No waves, juice, or XP yet. |
 | `shared/palette`, `shared/pool` | Implemented, tested |
 | `shared/kaijuboot` layered content database | Implemented |
 | `shared/spritesheet` | Implemented: sheet schema, atlas loader, UV conversion, per-entity animator. Replaces the engine's broken sprite path. |
 | `shared/juice` | Empty, doc only |
-| `tools/spritegen` | Plan, plus `placeholder.py` generating the white silhouette atlases. No ComfyUI pipeline yet. |
+| `tools/spritegen` | Plan, plus `placeholder.py` generating white silhouette atlases with 1px outlines. No ComfyUI pipeline yet. |
 
 `make test` passes, and the suite is clean under `-race`.
 
@@ -56,28 +56,22 @@ All of it is on `main`. Two branches were merged: `feat/noise-floor-gameplay`
 
 Iteration notes for the next demo: [DEMO-NOTES.md](DEMO-NOTES.md).
 
-### Two blocking prerequisites, each attached to the task it blocks
+### One blocking prerequisite
 
-These came out of whole-branch reviews and must not be lost — each is cheap
-now and expensive later.
+**Before the wave director: split state out of `Arena`.** `Arena` is now 22 fields and owns
+engine framing, horde presentation, projectile presentation, simulation orchestration, and a
+stand-in spawn director. The three-file split (`arena.go`, `enemies.go`, `combat.go`) is the
+right *file* split but not a *state* split. Extract `hordeView{spriteSets, enemyViews}` and
+`projectileView{set, sprites, live}`, each with its own `Sync`, and leave `Arena.Update` as pure
+orchestration.
 
-**Before Task 8 (wave director): move enemy simulation into `internal/horde`.**
-Right now `internal/horde` owns only a pool wrapper, and *all* enemy simulation
-— steering dispatch, integration, safe-zone clamping — lives inside
-`arena.updateHorde`'s closure in `internal/arena/enemies.go`. Task 8's director
-and Task 10's damage and death have nowhere to go but that same closure. The
-decoupling seam already exists and is unused: `actor.SafeZone`. Moving
-`enemyVelocity`, the integration step and `clampArmed` into a
-`horde.Step(dt, target, zone)` leaves `enemies.go` as pure view-sync and gives
-both later tasks an obvious home. `aberrantStandoff` is archetype design data
-currently sitting in the render-wiring file for want of that seam; it moves too.
+The whole-branch reviewer put the cost plainly: an hour now, a day after juice and XP land on
+top. The director has to tear `updateHorde` apart anyway. Do it as the director branch's first
+commit, exactly as `horde.Step` was the first commit of the branch before it — that pattern
+worked well twice now.
 
-**Before Task 10 (damage and death): pool the animator.** `spawnEnemy`
-allocates a fresh `spritesheet.Animator` per spawn. That is bounded and harmless
-today because nothing despawns, but spec §5.2 names allocation churn and GC
-pauses during a wave as the measured risk, and death is what starts enemies
-cycling. `despawnEnemy` already exists and owns the unwind — pool the animator
-in the same change that first calls it.
+The earlier prerequisite (pool the animator before death lands) is **done** — `SpriteSet` now
+pre-creates an animator per slot and hands both out together.
 
 ### Then
 
@@ -127,14 +121,13 @@ ink in about 8.3 seconds of real time, so aim by wall-clock, not frames.
 2. **`spike-kaiju/` is still on disk** — ~130 MB of throwaway feasibility spike
    (engine clone, binary, video capture). Gitignored and safe to delete; kept
    only because deleting it was never explicitly approved.
-3. ~~**Horde value treatment**~~ — resolved: actors crossfade ink↔paper based on
-   the ground they stand on, so they invert as the page does. Implemented for
-   both the player and the horde; closes spec §10 open risk 1.
-   **One open follow-up:** a pure value crossfade has a crossover point where an
-   actor on the boundary matches the ground. The standard fix is a 1px
-   opposite-value outline, which is complementary rather than an alternative —
-   the crossfade handles broad value match, the outline guarantees a hard edge.
-   Cheap to add in `tools/spritegen/placeholder.py`. Not yet decided.
+3. ~~**Horde value treatment**~~ — **fully resolved**, closing spec §10 open risk 1.
+   Actors crossfade ink↔paper based on the ground they stand on, *and* carry a
+   1px mid-grey outline. The two are complementary: the crossfade handles broad
+   value match, the outline guarantees a hard edge at the crossover where an
+   actor's value would otherwise equal the ground's. Mid-grey works because the
+   shader multiplies — a mid-grey texel always renders at half the body's
+   luminance, whichever way the actor is tinted.
 
 ## Risks worth knowing
 

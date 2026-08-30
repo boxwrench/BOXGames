@@ -2,6 +2,82 @@
 
 Notes taken while building, kept for the next demo. Newest session first.
 
+## 2026-08-30 — Outlines, the horde seam, and combat
+
+Four tasks plus three fix rounds, each independently reviewed, then a whole-branch review.
+The horde is now mortal: roughly 12–14 kills per 15 seconds with one weapon wired.
+
+### Reordering the plan was the right call
+
+The plan puts the wave director before weapons. But the director's defining behaviour is clear
+detection — a wave ends when no enemies remain — and nothing could kill an enemy, so it would
+have stalled on wave 1 forever and its central path would have been unexercisable. Kills came
+first; the director now gets to be written against a horde that actually dies.
+
+**Generalisable:** when a task's main behaviour depends on a capability that does not exist yet,
+building it first means discovering how it really behaves two tasks later.
+
+### Tests that cannot fail are worse than no tests
+
+The index-to-handle mapping test looked thorough: spawn four, despawn one, spawn a replacement,
+assert the parallel slices agree. It could not fail. `shared/pool` uses a LIFO free list, so the
+replacement landed back in the slot just freed, live handles stayed contiguous, and enumeration
+position equalled handle for every entry — the exact coincidence the test was written to rule
+out. A buggy implementation using a counter instead of the real handle would have passed.
+
+Catching it needed reading the pool's *reuse policy*, not the test. The rewrite forces a
+persistent hole (despawn a middle handle, no replacement) so live handles `[0,2,3,4,5]` sit at
+positions `[0,1,2,3,4]`, and it was then demonstrated failing against a deliberately broken
+implementation.
+
+**A test counted as coverage while unable to fail is worse than a known gap.**
+
+### Bugs that only detonate later are worth more than bugs that fail today
+
+Across two whole-branch reviews the highest-value findings were all latent:
+
+- A spawn timer accumulating without bound — harmless until death lands, then the first kill
+  triggers a spawn every frame until the banked credit drains.
+- A despawn path that would nil-panic, because the archetype needed to release the sprite was
+  only reachable through the pool entry being freed.
+- A `Hit` carrying a frame-local slice index rather than a handle — correct today because it is
+  consumed immediately, ruinous for the deferred effects juice and XP are made of.
+
+Today's failure is visible. Next month's is a debugging session.
+
+### Ask for the number that would be wrong
+
+Every visual and behavioural claim this session was pinned to a measurement chosen so a plausible
+wrong answer could not pass:
+
+- Not "do enemies appear" but a **kill count** — frames look perfect while the damage loop is
+  disconnected.
+- Not "does the outline show" but **outline luminance against body luminance**, where the
+  mechanism requires exactly half. That relationship caught a bad sample whose numbers were
+  otherwise believable.
+- Not "does it look round" but **horizontal versus vertical extent in world units**.
+
+Where a measurement has a checkable algebraic relationship, require the report to state and check
+it — then a bad sample is self-evident rather than merely plausible.
+
+### Structural refactors go first, in their own commit
+
+`horde.Step` was the first commit of this branch and it landed clean, was reviewed on its own,
+and the combat work inherited a good seam. The same pattern is queued for the next branch:
+`Arena` has reached 22 fields, and the reviewer priced the extraction at an hour now versus a day
+after juice and XP. Recorded as blocking rather than as a backlog note, because the whole point
+is that it gets more expensive.
+
+### Process notes
+
+- Two more implementers were killed mid-task by spend limits; resuming preserved their context
+  both times. That is now four for four.
+- One implementer mutation-tested its own new tests unprompted — deliberately breaking ordering
+  and dropping a latch to confirm they failed. That is the standard to aim for.
+- One reported a clean negative result with a correct diagnosis rather than tuning constants to
+  make a metric pass. Briefs that demand a number and say "an honest negative beats a green
+  checkmark" get honest negatives.
+
 ## 2026-08-29 — Boundary calibration, sprites, enemies (tasks A, 6, 7a–7c)
 
 Same agent-driven shape as the previous session. Five tasks plus three fix
