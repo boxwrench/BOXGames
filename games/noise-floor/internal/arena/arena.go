@@ -37,16 +37,31 @@ const (
 	playerSize    = 0.6
 
 	// playerTextureKey is the player's atlas image key in the content
-	// database (see games/noise-floor/assets/sheets), mirroring
-	// archetypeTextureKey for enemies.
+	// database (see games/noise-floor/assets/sheets).
 	playerTextureKey = "player.png"
 
-	// actorTintBand is the distance, on either side of the safe boundary,
-	// over which an actor's tint crossfades between ink and paper. It
-	// matches the stain shader's front softness (assets/shaders/src/boxstain.frag)
-	// so an actor finishes inverting over roughly the same distance the
-	// ground beneath it takes to change.
-	actorTintBand float32 = 0.6
+	// stainFrontSoftness MUST match FRONT_SOFTNESS in
+	// assets/shaders/src/boxstain.frag: the width, in stain-plane world
+	// units, of the shader's corruption-front ramp. GLSL cannot be imported
+	// into Go, so this is a hand-kept duplicate -- the same situation
+	// shared/palette is in with its own copies of the shader's color
+	// literals, which it guards with a tripwire test (palette_test.go's
+	// TestShaderPaletteSync). TestActorTintBandMatchesShaderFrontSoftness
+	// below does the same job for this constant: if it ever fails, update
+	// whichever of this constant or FRONT_SOFTNESS has drifted from the
+	// other.
+	stainFrontSoftness = 0.6
+
+	// actorTintBand is the distance beyond the safe boundary over which an
+	// actor's tint crossfades from ink to paper. It is stainFrontSoftness
+	// converted from stain-plane units to gameplay-plane units by the
+	// inverse of stainPlaneRadius's scaling, so an actor finishes inverting
+	// over exactly the on-screen distance the ground beneath it takes to
+	// change. The ramp itself is one-sided to match the shader's
+	// smoothstep(front, front+FRONT_SOFTNESS, r): full ink right up to the
+	// boundary, crossfading to paper only in the band outward from it -- see
+	// actorColor.
+	actorTintBand float32 = stainFrontSoftness * cameraZ / (cameraZ - render.StainDepth)
 )
 
 // stainPlaneRadius converts a gameplay-plane radius into the radius that, drawn
@@ -70,10 +85,40 @@ type Arena struct {
 
 	spawner    *horde.Spawner
 	rng        *rand.Rand
-	spriteSets map[actor.Archetype]*render.SpriteSet
+	spriteSets map[actor.Archetype]spriteBank
 	atlases    map[actor.Archetype]*spritesheet.Atlas
 	enemyViews []enemyView
 	spawnTimer float64
+}
+
+// loadActorAtlas reads a sprite sheet's sidecar from the content database and
+// parses it. textureKey is the atlas image name in the content database
+// (e.g. "mote.png"); label identifies the caller in error text (e.g.
+// "player", or an archetype's Name()). Both the player bootstrap below and
+// enemies.go's buildHorde use this so their error wording cannot drift.
+func loadActorAtlas(host *engine.Host, textureKey, label string) (*spritesheet.Atlas, error) {
+	sidecar, err := host.AssetDatabase().Read(textureKey + ".json")
+	if err != nil {
+		return nil, fmt.Errorf("arena: reading sheet sidecar for %s (%s.json): %w", label, textureKey, err)
+	}
+	atlas, err := spritesheet.LoadAtlas(sidecar)
+	if err != nil {
+		return nil, fmt.Errorf("arena: loading atlas for %s: %w", label, err)
+	}
+	return atlas, nil
+}
+
+// newIdleAnimator creates an animator over atlas and starts its "idle" clip.
+// label identifies the caller in error text. Used both by the player
+// bootstrap below (once, at startup) and by enemies.go's spawnEnemy (once
+// per spawn, since each live enemy needs its own animator state) so their
+// error wording cannot drift.
+func newIdleAnimator(atlas *spritesheet.Atlas, label string) (*spritesheet.Animator, error) {
+	animator := spritesheet.NewAnimator(atlas)
+	if err := animator.Play("idle"); err != nil {
+		return nil, fmt.Errorf("arena: %s atlas has no idle clip: %w", label, err)
+	}
+	return animator, nil
 }
 
 // breathPhase decides whether the demo loop should be washing the page back
@@ -96,12 +141,17 @@ func breathPhase(level float32, receding bool) bool {
 // the centre, not by the global corruption level: the corruption shader
 // paints clean paper inside SafeRadius() and ink outside it, so an actor's
 // own position is what decides which ground it is standing on.
+//
+// The ramp is one-sided, matching the shader's own
+// smoothstep(front, front+FRONT_SOFTNESS, r): an actor is fully ink right up
+// to and including the boundary itself (dist <= safeRadius), then crossfades
+// to fully paper over actorTintBand beyond it (dist >= safeRadius+
+// actorTintBand). A symmetric, two-sided ramp centred on the boundary would
+// start inverting an actor before the ground under it has changed at all.
 func actorColor(pos matrix.Vec2, safeRadius float32) matrix.Color {
 	dist := pos.Length()
-	inner := safeRadius - actorTintBand
-	outer := safeRadius + actorTintBand
 
-	t := (dist - inner) / (outer - inner)
+	t := (dist - safeRadius) / actorTintBand
 	if t < 0 {
 		t = 0
 	} else if t > 1 {
@@ -138,21 +188,17 @@ func New(host *engine.Host) (*Arena, error) {
 		stain:      stain,
 	}
 
-	sidecar, err := host.AssetDatabase().Read(playerTextureKey + ".json")
+	atlas, err := loadActorAtlas(host, playerTextureKey, "player")
 	if err != nil {
-		return nil, fmt.Errorf("arena: reading sheet sidecar for player (%s.json): %w", playerTextureKey, err)
-	}
-	atlas, err := spritesheet.LoadAtlas(sidecar)
-	if err != nil {
-		return nil, fmt.Errorf("arena: loading atlas for player: %w", err)
+		return nil, err
 	}
 	sprite, err := render.NewSprite(host, playerTextureKey, playerSize)
 	if err != nil {
 		return nil, fmt.Errorf("arena: creating player sprite: %w", err)
 	}
-	animator := spritesheet.NewAnimator(atlas)
-	if err := animator.Play("idle"); err != nil {
-		return nil, fmt.Errorf("arena: player atlas has no idle clip: %w", err)
+	animator, err := newIdleAnimator(atlas, "player")
+	if err != nil {
+		return nil, err
 	}
 	sprite.Show()
 	a.playerSprite = sprite

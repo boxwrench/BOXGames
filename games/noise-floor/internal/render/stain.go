@@ -68,6 +68,15 @@ func NewStain(host *engine.Host, width, height float32) (*Stain, error) {
 
 // SetBoundary uploads the CPU-authoritative boundary. safeRadius is in world
 // units; level is 0 (clean) to 1 (consumed) and drives decoration only.
+//
+// level travels in the shader data's alpha channel (see the .a packing note
+// on sd.Color in NewStain) -- it carries corruption data, not blend opacity.
+// shader_data_registry.Create resolves both "unlit" and "unlit_transparent"
+// to the same *ShaderDataUnlit type (shader_data_basic_unlit.go), so the type
+// assertion in NewStain cannot detect a pipeline swap. boxstain.material
+// MUST stay on an opaque pipeline: on a transparent one, .a is silently
+// reinterpreted as blend alpha and the stain fades as corruption rises
+// instead of decorating it.
 func (s *Stain) SetBoundary(safeRadius, level float32) {
 	s.shaderData.Color = matrix.NewColor(safeRadius, s.width, s.height, level)
 }
