@@ -27,6 +27,13 @@ multiplicative shader: texture * tint. A white atlas is neutral, yielding
 the tint directly -- ink tints give ink, paper tints give paper. A pre-baked
 ink atlas cannot work with a value treatment. Background is fully transparent.
 
+Outlines: each shape is surrounded by a 1px ring in mid-grey (128, 128, 128).
+Because the shader multiplies, a white body takes the tint fully; a mid-grey
+outline takes half of it. This means the outline always renders at half the
+body's luminance -- darker than the body when the actor is light (on paper),
+still distinct when the actor is dark (on ink) -- guaranteeing a hard edge
+even at the crossfade midpoint where the body fades to mid-value ground.
+
 Silhouette constraint (binding, see task-6 brief): the player and every
 enemy archetype share a value range in-game (both crossfade ink->paper with
 local corruption) and can only be told apart by silhouette. So every shape
@@ -45,6 +52,11 @@ from PIL import Image, ImageDraw
 # module docstring.
 WHITE = (255, 255, 255, 255)
 
+# Outline in mid-grey: multiplied by tint, this yields half luminance,
+# sitting between body and ground even at the crossfade midpoint.
+# See module docstring.
+GREY = (128, 128, 128, 255)
+
 FRAME = 32
 FRAMES_PER_CLIP = 4
 FPS = 8
@@ -53,6 +65,41 @@ OUT_DIR = Path(__file__).resolve().parents[2] / "games" / "noise-floor" / "asset
 
 def _canvas():
     return Image.new("RGBA", (FRAME, FRAME), (0, 0, 0, 0))
+
+
+def _add_outline(img):
+    """Add a 1px mid-grey outline to an opaque white shape.
+
+    Scans the image for transparent pixels that are orthogonally adjacent
+    (up, down, left, right) to opaque white pixels, and sets them to opaque
+    mid-grey. This creates a hard-edged outline ring without eating into
+    the shape's body.
+    """
+    pixels = img.load()
+    w, h = img.size
+
+    # Build a list of pixels to outline (transparent pixels adjacent to white).
+    # Do this in two passes to avoid painting while iterating.
+    to_outline = set()
+    for y in range(h):
+        for x in range(w):
+            # Only outline transparent pixels
+            if pixels[x, y][3] == 0:  # alpha == 0
+                # Check orthogonal neighbors for opaque white
+                for dx, dy in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < w and 0 <= ny < h:
+                        neighbor = pixels[nx, ny]
+                        # Is the neighbor opaque white?
+                        if neighbor[3] == 255 and neighbor[:3] == (255, 255, 255):
+                            to_outline.add((x, y))
+                            break
+
+    # Paint outlines
+    for x, y in to_outline:
+        pixels[x, y] = GREY
+
+    return img
 
 
 def _player_chevron(t):
@@ -161,6 +208,8 @@ ARCHETYPES = {
 def build_strip(draw_fn):
     """Render FRAMES_PER_CLIP frames into one horizontal strip atlas."""
     frames = [draw_fn(t) for t in range(FRAMES_PER_CLIP)]
+    # Add outlines to each frame
+    frames = [_add_outline(frame) for frame in frames]
     atlas = Image.new("RGBA", (FRAME * FRAMES_PER_CLIP, FRAME), (0, 0, 0, 0))
     rects = []
     for i, frame in enumerate(frames):
