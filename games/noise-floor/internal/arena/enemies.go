@@ -13,7 +13,6 @@ import (
 	"boxwrench.dev/boxgames/shared/spritesheet"
 
 	"kaijuengine.com/engine"
-	"kaijuengine.com/matrix"
 )
 
 // Horde sizing.
@@ -44,13 +43,6 @@ const (
 	enemyCapacityPerArchetype = 32
 	spawnInterval             = 0.6
 	maxLiveEnemies            = 40
-
-	// aberrantStandoff is the Aberrant's hold distance from its target (Task
-	// 7a brief archetype table: "Standoff at 5.0"). It is not exported by
-	// the actor package -- StandoffVelocity takes it as a parameter rather
-	// than baking it in -- so the archetype-to-steering wiring done here is
-	// the natural place to name it.
-	aberrantStandoff float32 = 5.0
 )
 
 // enemyArchetypes is the closed set of horde archetypes, used both to size
@@ -85,10 +77,6 @@ type enemyView struct {
 	// a.spawner.Get(handle).Archetype -- which returns nil once the handle
 	// is no longer live, i.e. exactly when despawnEnemy needs it most.
 	archetype actor.Archetype
-
-	// entered latches true the first time this enemy's position has been
-	// inside the safe zone. See clampArmed.
-	entered bool
 }
 
 // shouldSpawn decides whether the spawn timer has fired and there is still
@@ -113,37 +101,6 @@ func clampSpawnTimer(timer, interval float64, live, maxLive int) float64 {
 		return interval
 	}
 	return timer
-}
-
-// clampArmed decides whether an enemy is clamped to the safe zone this
-// frame, and returns the (possibly newly) latched "has ever entered" flag to
-// store for next frame.
-//
-// Enemies spawn outside the safe zone by design and walk inward; clamping
-// them from frame one would snap every enemy straight onto the boundary the
-// instant it spawns, and the spawn ring outside the safe zone would never be
-// visible. So an enemy is only clamped once it has entered the safe zone at
-// least once -- and once that happens, the flag latches permanently for the
-// rest of that enemy's life, even if it later walks back out.
-func clampArmed(everEntered bool, pos matrix.Vec2, zone actor.SafeZone) (clamp, nowEntered bool) {
-	nowEntered = everEntered || zone.Contains(pos)
-	return nowEntered, nowEntered
-}
-
-// enemyVelocity computes one enemy's steering velocity for this frame, using
-// 7a's per-archetype steering assignment (Task 7a brief archetype table):
-// Mote, Dendrite and Overfit chase; Aberrant holds standoff distance; Lancer
-// runs its own cruise/telegraph/charge state machine.
-func enemyVelocity(e *horde.Enemy, target matrix.Vec2, dt float64) matrix.Vec2 {
-	stats := actor.StatsFor(e.Archetype)
-	switch e.Archetype {
-	case actor.Aberrant:
-		return actor.StandoffVelocity(e.Pos, target, stats.Speed, aberrantStandoff)
-	case actor.Lancer:
-		return e.Lancer.Update(dt, e.Pos, target)
-	default:
-		return actor.ChaseVelocity(e.Pos, target, stats.Speed)
-	}
 }
 
 // buildHorde wires up the enemy model (7a's Spawner) to rendering: one
@@ -183,8 +140,9 @@ func (a *Arena) buildHorde(host *engine.Host) error {
 	return nil
 }
 
-// updateHorde advances the temporary spawn cadence, then steers, animates
-// and redraws every live enemy for this frame.
+// updateHorde advances the temporary spawn cadence, steps the enemy
+// simulation (horde.Spawner.Step owns steering, integration and safe-zone
+// clamping), then syncs every live enemy's sprite to its new state.
 func (a *Arena) updateHorde(dt float64) {
 	a.spawnTimer += dt
 	a.spawnTimer = clampSpawnTimer(a.spawnTimer, spawnInterval, a.spawner.Live(), maxLiveEnemies)
@@ -195,19 +153,11 @@ func (a *Arena) updateHorde(dt float64) {
 	}
 
 	target := a.Player.Position()
+	a.spawner.Step(dt, target, a.Corruption)
+
 	safeRadius := a.Corruption.SafeRadius()
 	a.spawner.Each(func(handle int, e *horde.Enemy) {
 		view := &a.enemyViews[handle]
-
-		vel := enemyVelocity(e, target, dt)
-		e.Pos = e.Pos.Add(vel.Scale(float32(dt)))
-
-		clamp, entered := clampArmed(view.entered, e.Pos, a.Corruption)
-		view.entered = entered
-		if clamp {
-			e.Pos = actor.ClampToSafeZone(e.Pos, a.Corruption)
-		}
-
 		view.animator.Update(dt)
 		view.sprite.SetPosition(e.Pos)
 		view.sprite.SetUVs(view.animator.UVs())
