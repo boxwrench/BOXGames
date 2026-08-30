@@ -87,6 +87,7 @@ func (a *Arena) buildCombat(host *engine.Host) error {
 
 	a.targets = make([]weapon.Target, 0, spawnerCapacity)
 	a.targetHandles = make([]int, 0, spawnerCapacity)
+	a.died = make([]int, 0, spawnerCapacity)
 	return nil
 }
 
@@ -110,15 +111,16 @@ func refillTargets(spawner *horde.Spawner, targets []weapon.Target, handles []in
 // resolveHits applies each collision hit: despawns its projectile and
 // damages the enemy it struck, translating hit.Target (an index into the
 // frame's targets/handles slices, not itself a pool handle) back into a
-// handle via handles. It returns the handles that died as a result.
+// handle via handles. It returns the handles that died as a result, reusing
+// the passed-in died slice via [:0]+append to avoid allocation.
 //
 // horde.Damage reports died at most once per enemy -- it returns false for
 // an enemy already at or below zero health -- so two hits landing on the
 // same enemy in one frame still report exactly one death here; this function
 // adds no death path of its own, it only relays what Damage already
 // guarantees.
-func resolveHits(hits []weapon.Hit, handles []int, battery *weapon.Battery, spawner *horde.Spawner) []int {
-	var died []int
+func resolveHits(hits []weapon.Hit, handles []int, died []int, battery *weapon.Battery, spawner *horde.Spawner) []int {
+	died = died[:0]
 	for _, hit := range hits {
 		battery.Despawn(hit.Projectile)
 		handle := handles[hit.Target]
@@ -149,7 +151,8 @@ func (a *Arena) updateCombat(dt float64) {
 	a.battery.Step(dt)
 
 	hits := weapon.Collide(a.battery, a.targets, projectileSize)
-	for _, handle := range resolveHits(hits, a.targetHandles, a.battery, a.spawner) {
+	a.died = resolveHits(hits, a.targetHandles, a.died, a.battery, a.spawner)
+	for _, handle := range a.died {
 		a.despawnEnemy(handle)
 	}
 

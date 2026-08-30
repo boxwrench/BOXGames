@@ -14,27 +14,26 @@ import (
 // TestRefillTargetsHandleAtIndexMatchesTargetAtIndex is the mapping this
 // task's brief calls out as the one most likely to damage the wrong enemy if
 // it is wrong: for every i, handles[i] must be the pool handle that produced
-// targets[i]. It spawns several enemies, despawns one, and spawns a
-// replacement so a pool slot is reused with a different enemy at the same
-// handle before refilling -- the case a naive index==handle assumption would
-// get right by accident and a real bug would not.
+// targets[i]. This test creates a persistent hole: it spawns 6 enemies then
+// despawns one in the middle without replacement, so enumeration indices
+// diverge from pool handles. Enumeration yields indices [0,1,2,3,4] for
+// handles [0,2,3,4,5] -- if refillTargets wrongly used an enumeration counter
+// instead of the real handle from Each's callback, it would report [0,1,2,3,4]
+// for handles and the test would fail when verifying that each handle is live.
 func TestRefillTargetsHandleAtIndexMatchesTargetAtIndex(t *testing.T) {
 	s := horde.NewSpawner(8, rand.New(rand.NewSource(1)))
 	var handles []int
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 6; i++ {
 		h, ok := s.Spawn(actor.Mote, 10)
 		if !ok {
 			t.Fatalf("Spawn %d failed", i)
 		}
 		handles = append(handles, h)
 	}
-	// Despawn one and spawn a different archetype into the reused slot, so
-	// refillTargets must reflect the CURRENT occupant, not a stale one.
+	// Despawn one in the middle (handle at index 1) and leave the hole empty.
+	// This creates a persistent gap: live enemies are at handles [0,2,3,4,5],
+	// but enumeration position != handle for all handles after the gap.
 	s.Despawn(handles[1])
-	replacement, ok := s.Spawn(actor.Dendrite, 10)
-	if !ok {
-		t.Fatal("replacement Spawn failed")
-	}
 
 	targets := make([]weapon.Target, 0, 8)
 	handleScratch := make([]int, 0, 8)
@@ -46,29 +45,26 @@ func TestRefillTargetsHandleAtIndexMatchesTargetAtIndex(t *testing.T) {
 	if got := s.Live(); len(targets) != got {
 		t.Fatalf("len(targets) = %d, want spawner.Live() = %d", len(targets), got)
 	}
+	// The crucial check: every handle must be live, and targets[i] must
+	// actually correspond to handles[i]. If refillTargets wrongly used an
+	// enumeration counter instead of the real handle, this will fail: the
+	// second iteration (i=1) would have handle=1 (the hole), which is not live.
 	for i, tgt := range targets {
 		h := handleScratch[i]
 		e := s.Get(h)
 		if e == nil {
-			t.Fatalf("handles[%d] = %d is not a live handle", i, h)
+			t.Fatalf("handles[%d] = %d is not a live handle (persisted hole at handle 1)", i, h)
 		}
 		if tgt.Position() != e.Position() || tgt.Radius() != e.Radius() {
 			t.Fatalf("targets[%d] = %+v does not correspond to handles[%d] = %d (enemy %+v)", i, tgt, i, h, e)
 		}
 	}
-	// The reused slot's replacement (Dendrite) must appear, not the
-	// despawned Mote that used to occupy it.
-	foundReplacement := false
-	for i, h := range handleScratch {
-		if h == replacement {
-			foundReplacement = true
-			if targets[i].Radius() != actor.StatsFor(actor.Dendrite).Size {
-				t.Fatalf("reused slot's target radius = %v, want Dendrite's %v", targets[i].Radius(), actor.StatsFor(actor.Dendrite).Size)
-			}
+	// Verify the despawned handle does not appear.
+	despawnedHandle := handles[1]
+	for _, h := range handleScratch {
+		if h == despawnedHandle {
+			t.Fatalf("despawned handle %d should not appear in refilled handles", despawnedHandle)
 		}
-	}
-	if !foundReplacement {
-		t.Fatal("replacement handle not found in refilled handles -- reused slot missing from targets")
 	}
 }
 
@@ -119,7 +115,7 @@ func TestResolveHitsKillReportsHandleDead(t *testing.T) {
 	handles := []int{h}
 	hits := []weapon.Hit{{Projectile: ph, Target: 0, Damage: 3}}
 
-	died := resolveHits(hits, handles, b, s)
+	died := resolveHits(hits, handles, []int{}, b, s)
 
 	if len(died) != 1 || died[0] != h {
 		t.Fatalf("died = %v, want [%d]", died, h)
@@ -148,7 +144,7 @@ func TestResolveHitsNonLethalReportsNothing(t *testing.T) {
 	handles := []int{h}
 	hits := []weapon.Hit{{Projectile: ph, Target: 0, Damage: 3}}
 
-	died := resolveHits(hits, handles, b, s)
+	died := resolveHits(hits, handles, []int{}, b, s)
 
 	if len(died) != 0 {
 		t.Fatalf("died = %v, want none (Dendrite survives 3 damage on 12 health)", died)
@@ -185,7 +181,7 @@ func TestResolveHitsSameEnemyTwiceInOneFrameDiesOnce(t *testing.T) {
 		{Projectile: ph2, Target: 0, Damage: 3},
 	}
 
-	died := resolveHits(hits, handles, b, s)
+	died := resolveHits(hits, handles, []int{}, b, s)
 
 	if len(died) != 1 {
 		t.Fatalf("died = %v, want exactly one entry (reported dead once, not twice)", died)

@@ -99,6 +99,7 @@ type Arena struct {
 	projectileLive      []bool
 	targets             []weapon.Target // scratch, refilled each frame -- see refillTargets
 	targetHandles       []int           // parallel to targets: targetHandles[i] is targets[i]'s pool handle
+	died                []int           // scratch, refilled each frame in resolveHits
 }
 
 // loadActorAtlas reads a sprite sheet's sidecar from the content database and

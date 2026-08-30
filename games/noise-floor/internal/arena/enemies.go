@@ -205,9 +205,8 @@ func (a *Arena) spawnEnemy(arch actor.Archetype) {
 // longer live -- i.e. exactly when this unwind needs it. The animator has no
 // pool of its own; zeroing the view is enough to drop it.
 //
-// Nothing calls this in normal play yet: spawnEnemy's two partial-acquire
-// failure paths above are the only callers, and death (a later task) will be
-// the first real one. That is expected, not a bug.
+// It is called by resolveHits for every enemy killed in combat, and by
+// spawnEnemy's failure path when sprite acquisition fails.
 func (a *Arena) despawnEnemy(handle int) {
 	view := a.enemyViews[handle]
 	if view.sprite != nil {
