@@ -7,6 +7,7 @@ import (
 	"boxwrench.dev/boxgames/games/noisefloor/internal/actor"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/horde"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
+	"boxwrench.dev/boxgames/games/noisefloor/internal/weapon"
 	"boxwrench.dev/boxgames/shared/palette"
 	"boxwrench.dev/boxgames/shared/spritesheet"
 
@@ -86,9 +87,19 @@ type Arena struct {
 	spawner    *horde.Spawner
 	rng        *rand.Rand
 	spriteSets map[actor.Archetype]spriteBank
-	atlases    map[actor.Archetype]*spritesheet.Atlas
 	enemyViews []enemyView
 	spawnTimer float64
+
+	weapon              *weapon.Weapon
+	battery             *weapon.Battery
+	projectileSprites   []*render.Sprite
+	projectileAnimators []*spritesheet.Animator
+	projectileLive      []bool
+	targets             []weapon.Target // scratch, refilled each frame -- see refillTargets
+	targetHandles       []int           // parallel to targets: targetHandles[i] is targets[i]'s pool handle
+	died                []int           // scratch, refilled each frame in resolveHits
+	hits                []weapon.Hit    // scratch, refilled each frame by weapon.Collide
+	expiredProjectiles  []int           // scratch, refilled each frame by weapon.Battery.Step
 }
 
 // loadActorAtlas reads a sprite sheet's sidecar from the content database and
@@ -109,10 +120,11 @@ func loadActorAtlas(host *engine.Host, textureKey, label string) (*spritesheet.A
 }
 
 // newIdleAnimator creates an animator over atlas and starts its "idle" clip.
-// label identifies the caller in error text. Used both by the player
-// bootstrap below (once, at startup) and by enemies.go's spawnEnemy (once
-// per spawn, since each live enemy needs its own animator state) so their
-// error wording cannot drift.
+// label identifies the caller in error text. Used by the player bootstrap
+// below, which owns one permanent sprite and animator outright -- unlike
+// enemies and projectiles, which borrow theirs from a render.SpriteSet
+// (Task 9b), so their per-slot animators are created once, in
+// render.NewSpriteSet, not here.
 func newIdleAnimator(atlas *spritesheet.Atlas, label string) (*spritesheet.Animator, error) {
 	animator := spritesheet.NewAnimator(atlas)
 	if err := animator.Play("idle"); err != nil {
@@ -207,6 +219,9 @@ func New(host *engine.Host) (*Arena, error) {
 	if err := a.buildHorde(host); err != nil {
 		return nil, err
 	}
+	if err := a.buildCombat(host); err != nil {
+		return nil, err
+	}
 
 	a.updateID = host.Updater.AddUpdate(a.Update)
 	return a, nil
@@ -232,4 +247,5 @@ func (a *Arena) Update(dt float64) {
 	a.playerSprite.SetColor(actorColor(a.Player.Position(), a.Corruption.SafeRadius()))
 
 	a.updateHorde(dt)
+	a.updateCombat(dt)
 }

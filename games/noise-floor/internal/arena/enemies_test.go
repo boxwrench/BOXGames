@@ -7,8 +7,7 @@ import (
 	"boxwrench.dev/boxgames/games/noisefloor/internal/actor"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/horde"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
-
-	"kaijuengine.com/matrix"
+	"boxwrench.dev/boxgames/shared/spritesheet"
 )
 
 // --- shouldSpawn -------------------------------------------------------
@@ -82,67 +81,6 @@ func TestSpawnTimerProducesExactlyOneSpawnWhenSlotOpens(t *testing.T) {
 	}
 }
 
-// --- clampArmed ----------------------------------------------------------
-
-// stubZone is a minimal actor.SafeZone for testing clampArmed without a real
-// Corruption.
-type stubZone struct {
-	radius float32
-}
-
-func (z stubZone) SafeRadius() float32         { return z.radius }
-func (z stubZone) Contains(p matrix.Vec2) bool { return p.Length() <= z.radius }
-
-func TestClampArmedNotClampedBeforeFirstEntry(t *testing.T) {
-	zone := stubZone{radius: 5}
-	outside := matrix.NewVec2(10, 0) // well outside the zone
-	clamp, entered := clampArmed(false, outside, zone)
-	if clamp {
-		t.Fatal("clampArmed(never entered, outside) clamp = true, want false: " +
-			"a freshly spawned enemy outside the safe zone must not be clamped " +
-			"or it teleports onto the boundary at spawn")
-	}
-	if entered {
-		t.Fatal("clampArmed(never entered, outside) entered = true, want false")
-	}
-}
-
-func TestClampArmedClampedOnceEntered(t *testing.T) {
-	zone := stubZone{radius: 5}
-	outside := matrix.NewVec2(10, 0)
-	clamp, entered := clampArmed(true, outside, zone)
-	if !clamp {
-		t.Fatal("clampArmed(already entered, outside) clamp = false, want true: " +
-			"an enemy that has been inside the safe zone must be clamped even " +
-			"if it is outside again this frame")
-	}
-	if !entered {
-		t.Fatal("clampArmed(already entered, outside) entered = false, want true")
-	}
-}
-
-func TestClampArmedLatchesPermanently(t *testing.T) {
-	zone := stubZone{radius: 5}
-	inside := matrix.NewVec2(1, 0)
-	outside := matrix.NewVec2(10, 0)
-
-	// First frame: enters the zone. Flag arms.
-	_, entered := clampArmed(false, inside, zone)
-	if !entered {
-		t.Fatal("clampArmed(never entered, inside) entered = false, want true: entering should arm the flag")
-	}
-
-	// Second frame: walks back outside. The flag must stay armed and the
-	// enemy must still be clamped -- entering once arms it permanently.
-	clamp, entered := clampArmed(entered, outside, zone)
-	if !clamp {
-		t.Fatal("clampArmed after latching, now outside: clamp = false, want true (latch must persist)")
-	}
-	if !entered {
-		t.Fatal("clampArmed after latching, now outside: entered = false, want true (latch must persist)")
-	}
-}
-
 // --- capacity agreement ---------------------------------------------------
 
 // TestSpawnerCapacityMatchesArchetypeBanks guards the invariant the brief
@@ -183,13 +121,16 @@ func newFakeSpriteBank(capacity int) *fakeSpriteBank {
 	return &fakeSpriteBank{capacity: capacity, live: make(map[*render.Sprite]bool)}
 }
 
-func (b *fakeSpriteBank) Acquire() (*render.Sprite, bool) {
+func (b *fakeSpriteBank) Acquire() (*render.Sprite, *spritesheet.Animator, bool) {
 	if len(b.live) >= b.capacity {
-		return nil, false
+		return nil, nil, false
 	}
 	sp := new(render.Sprite)
 	b.live[sp] = true
-	return sp, true
+	// The fake never calls any Animator method either, for the same reason
+	// it never calls Sprite methods (see the type doc comment) -- nil is a
+	// safe stand-in.
+	return sp, nil, true
 }
 
 func (b *fakeSpriteBank) Release(sp *render.Sprite) {
@@ -223,7 +164,7 @@ func TestDespawnEnemyReturnsSpriteAndHandle(t *testing.T) {
 	if !ok {
 		t.Fatal("spawner.Spawn failed unexpectedly")
 	}
-	sp, ok := bank.Acquire()
+	sp, _, ok := bank.Acquire()
 	if !ok {
 		t.Fatal("bank.Acquire failed unexpectedly")
 	}

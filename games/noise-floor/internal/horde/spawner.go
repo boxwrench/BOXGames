@@ -19,6 +19,12 @@ type Enemy struct {
 	Pos       matrix.Vec2
 	Health    int
 	Lancer    actor.LancerBrain // zero value is fine for non-Lancers
+
+	// entered latches true the first time this enemy's position has been
+	// inside the safe zone. See clampArmed in behaviour.go. This is
+	// simulation state, not view state -- it decides Step's own clamping,
+	// so it lives on the model rather than on any rendering side.
+	entered bool
 }
 
 // Spawner owns the enemy pool and places new enemies on a ring outside the
@@ -55,6 +61,7 @@ func (s *Spawner) Spawn(a actor.Archetype, safeRadius float32) (handle int, ok b
 	item.Pos = pos
 	item.Health = actor.StatsFor(a).Health
 	item.Lancer = actor.LancerBrain{}
+	item.entered = false // a respawned slot must not inherit a stale latch
 	return h, true
 }
 
