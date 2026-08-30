@@ -105,3 +105,34 @@ func TestCooldownCarriesRemainder(t *testing.T) {
 		t.Fatalf("shots = %d over %.2fs at cooldown 0.3s, want within 1 of %.2f (rate drifted with frame size)", shots, simSeconds, want)
 	}
 }
+
+func TestWeaponBurstAfterLargeDeltaNotOnePerFrame(t *testing.T) {
+	// After a catastrophic frame with a massive delta, the weapon must not
+	// machine-gun for many frames. The remainder is clamped to at most one
+	// Cooldown so subsequent normal frames follow the regular cadence.
+	w := New(Spec{Name: "test", Cooldown: 0.1})
+
+	// A massive delta that, if uncapped, would bank enough timer credit to
+	// fire every frame for ~600 frames.
+	if !w.Tick(30.0) {
+		t.Fatal("Tick(30.0) did not fire")
+	}
+
+	// Follow with normal-sized frames: 0.05 per frame (half the cooldown).
+	// At normal cadence, the weapon should fire every ~2 frames.
+	// Without capping: timer would be 29.9, firing every frame for all 50.
+	// With capping: timer capped to 0.1, firing every ~2 frames for ~26 shots.
+	shots := 0
+	for i := 0; i < 50; i++ {
+		if w.Tick(0.05) {
+			shots++
+		}
+	}
+
+	// With cap: expect ~26 shots (2 immediately from the overlap, then ~24 at normal cadence).
+	// Without cap: expect ~50 shots (one per frame).
+	// Threshold: 35 is well above normal cadence but below uncapped burst.
+	if shots > 35 {
+		t.Fatalf("After large Tick(30), got %d shots over 50 normal frames (want ~26), indicates burst not capped", shots)
+	}
+}

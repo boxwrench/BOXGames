@@ -41,11 +41,20 @@ func (w *Weapon) Ready() bool {
 // frame that overshoots does not lose the excess and the effective fire
 // rate does not drift with frame time. This mirrors the fix already made to
 // the Lancer's phase timer (actor.LancerBrain.Update).
+//
+// The carried remainder is clamped to at most one Cooldown to prevent a
+// catastrophic frame from creating a multi-frame burst; the weapon will fire
+// once and then resume its normal schedule.
 func (w *Weapon) Tick(dt float64) bool {
 	w.timer += dt
 	if w.timer < w.spec.Cooldown {
 		return false
 	}
 	w.timer -= w.spec.Cooldown
+	// Clamp accumulated remainder to at most one Cooldown to prevent
+	// bursting for many frames after a catastrophic frame.
+	if w.timer > w.spec.Cooldown {
+		w.timer = w.spec.Cooldown
+	}
 	return true
 }

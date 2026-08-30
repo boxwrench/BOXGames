@@ -80,3 +80,20 @@ func TestNearestTargetRespectsRangeBoundary(t *testing.T) {
 		t.Fatal("target just beyond maxRange should be out of range")
 	}
 }
+
+func TestNearestTargetReturnsNegativeOneOnFailure(t *testing.T) {
+	// When no target is in range, NearestTarget must return -1, not 0, to force
+	// the caller to check ok before using the index. This prevents the silent
+	// bug where a forgotten ok check silently targets index 0.
+	targets := []Target{
+		fakeTarget{pos: matrix.NewVec2(50, 0)},
+		fakeTarget{pos: matrix.NewVec2(20, 0)},
+	}
+	idx, ok := NearestTarget(matrix.Vec2Zero(), targets, 9)
+	if ok {
+		t.Fatal("NearestTarget returned ok=true for out-of-range targets, want false")
+	}
+	if idx != -1 {
+		t.Fatalf("NearestTarget returned idx=%d on failure, want -1", idx)
+	}
+}

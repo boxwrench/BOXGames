@@ -11,8 +11,9 @@ type Target interface {
 }
 
 // NearestTarget returns the index of the closest target within maxRange,
-// and ok=false when none is in range or targets is empty. Ties break
-// toward the lower index so selection is deterministic under test.
+// and ok=false when none is in range or targets is empty. Returns -1 when
+// no target is found, forcing the caller to check ok before using the index.
+// Ties break toward the lower index so selection is deterministic under test.
 func NearestTarget(from matrix.Vec2, targets []Target, maxRange float32) (idx int, ok bool) {
 	bestIdx := -1
 	var bestDist float32
@@ -27,7 +28,7 @@ func NearestTarget(from matrix.Vec2, targets []Target, maxRange float32) (idx in
 		}
 	}
 	if bestIdx == -1 {
-		return 0, false
+		return -1, false
 	}
 	return bestIdx, true
 }
