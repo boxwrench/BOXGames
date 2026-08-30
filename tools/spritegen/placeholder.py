@@ -135,7 +135,11 @@ def _dendrite(t, spikes=7):
     d = ImageDraw.Draw(img)
     cx = cy = FRAME / 2
     inner = 4
-    outer = 14 + 1.5 * math.sin(t * math.pi / 2)
+    # 12.5 (not the original 14) is the largest base radius whose peak
+    # frame (t=1, where the +1.5 sway is at its max) still leaves a 1px
+    # transparent margin on all four canvas edges once _add_outline's
+    # ring is added. See task-9a-report.md for the derivation.
+    outer = 12.5 + 1.5 * math.sin(t * math.pi / 2)
     pts = []
     for i in range(spikes * 2):
         ang = math.pi * i / spikes + t * 0.15
