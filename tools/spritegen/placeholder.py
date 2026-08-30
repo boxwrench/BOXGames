@@ -21,10 +21,11 @@ Emits the shared/spritesheet JSON schema (see
 Rects are in atlas pixels with a TOP-LEFT origin, exactly as
 shared/spritesheet.LoadAtlas expects -- no pre-normalisation, no pre-flip.
 
-Colour: fill is INK, taken from shared/palette/palette.go's HexInk
-(0x17161B); this script is Python, not Go, and cannot import that package,
-so the value is copied here as a literal -- if HexInk ever changes there,
-eyeball this too. Background is fully transparent, no second colour.
+Colour: shapes are drawn in OPAQUE WHITE (255, 255, 255), not pre-coloured.
+The colour comes from the runtime tint (actorColor in Go) applied via the
+multiplicative shader: texture * tint. A white atlas is neutral, yielding
+the tint directly -- ink tints give ink, paper tints give paper. A pre-baked
+ink atlas cannot work with a value treatment. Background is fully transparent.
 
 Silhouette constraint (binding, see task-6 brief): the player and every
 enemy archetype share a value range in-game (both crossfade ink->paper with
@@ -40,9 +41,9 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-# Sourced from shared/palette/palette.go: HexInk. Kept as a literal -- see
+# Opaque white: atlas is neutral, colour comes from runtime tint. See
 # module docstring.
-INK = (0x17, 0x16, 0x1B, 255)
+WHITE = (255, 255, 255, 255)
 
 FRAME = 32
 FRAMES_PER_CLIP = 4
@@ -67,7 +68,7 @@ def _player_chevron(t):
         (cx + width, cy + height),  # bottom-right
         (cx - width, cy + height),  # bottom-left
     ]
-    d.polygon(pts, fill=INK)
+    d.polygon(pts, fill=WHITE)
     return img
 
 
@@ -77,7 +78,7 @@ def _mote(t):
     d = ImageDraw.Draw(img)
     r = 6 + 1.5 * math.sin(t * math.pi / 2)
     cx = cy = FRAME / 2
-    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=INK)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=WHITE)
     return img
 
 
@@ -93,7 +94,7 @@ def _dendrite(t, spikes=7):
         ang = math.pi * i / spikes + t * 0.15
         r = outer if i % 2 == 0 else inner
         pts.append((cx + r * math.cos(ang), cy + r * math.sin(ang)))
-    d.polygon(pts, fill=INK)
+    d.polygon(pts, fill=WHITE)
     return img
 
 
@@ -109,7 +110,7 @@ def _aberrant(t):
         ang = 2 * math.pi * i / n
         r = r0 + 1.5 * math.sin(t * math.pi / 2 + i)
         pts.append((cx + r * math.cos(ang), cy + r * math.sin(ang)))
-    d.polygon(pts, fill=INK)
+    d.polygon(pts, fill=WHITE)
     return img
 
 
@@ -128,7 +129,7 @@ def _lancer(t):
         (cx - half_w * 0.6, cy + half_l),
         (cx - half_w, cy - half_l * 0.3),
     ]
-    d.polygon(pts, fill=INK)
+    d.polygon(pts, fill=WHITE)
     return img
 
 
@@ -141,7 +142,7 @@ def _overfit(t):
     lobes = [(0, 0, 9), (-7, -5, 6), (7, -5, 6), (-6, 7, 6), (6, 7, 6), (0, -9, 5)]
     for ox, oy, r in lobes:
         rr = r * pulse
-        d.ellipse([cx + ox - rr, cy + oy - rr, cx + ox + rr, cy + oy + rr], fill=INK)
+        d.ellipse([cx + ox - rr, cy + oy - rr, cx + ox + rr, cy + oy + rr], fill=WHITE)
     return img
 
 
