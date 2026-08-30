@@ -7,6 +7,7 @@ import (
 	"boxwrench.dev/boxgames/games/noisefloor/internal/actor"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/horde"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
+	"boxwrench.dev/boxgames/shared/spritesheet"
 )
 
 // --- shouldSpawn -------------------------------------------------------
@@ -120,13 +121,16 @@ func newFakeSpriteBank(capacity int) *fakeSpriteBank {
 	return &fakeSpriteBank{capacity: capacity, live: make(map[*render.Sprite]bool)}
 }
 
-func (b *fakeSpriteBank) Acquire() (*render.Sprite, bool) {
+func (b *fakeSpriteBank) Acquire() (*render.Sprite, *spritesheet.Animator, bool) {
 	if len(b.live) >= b.capacity {
-		return nil, false
+		return nil, nil, false
 	}
 	sp := new(render.Sprite)
 	b.live[sp] = true
-	return sp, true
+	// The fake never calls any Animator method either, for the same reason
+	// it never calls Sprite methods (see the type doc comment) -- nil is a
+	// safe stand-in.
+	return sp, nil, true
 }
 
 func (b *fakeSpriteBank) Release(sp *render.Sprite) {
@@ -160,7 +164,7 @@ func TestDespawnEnemyReturnsSpriteAndHandle(t *testing.T) {
 	if !ok {
 		t.Fatal("spawner.Spawn failed unexpectedly")
 	}
-	sp, ok := bank.Acquire()
+	sp, _, ok := bank.Acquire()
 	if !ok {
 		t.Fatal("bank.Acquire failed unexpectedly")
 	}

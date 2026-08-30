@@ -184,6 +184,34 @@ def _lancer(t):
     return img
 
 
+def _shot(t):
+    """Shot: a small elongated, tapered dash -- Task 9b's projectile.
+
+    Deliberately not round: the Mote is already the tiny-circle silhouette,
+    so a shot drawn as a circle would be confusable with it at a glance (see
+    task-9b brief). A tapered horizontal dash, at roughly a third of the
+    Mote's mask area, keeps every pairwise silhouette overlap well under the
+    0.7 ceiling (worst is 0.39 against the Mote; see
+    task-9b-report.md for the full table).
+    """
+    img = _canvas()
+    d = ImageDraw.Draw(img)
+    cx, cy = FRAME / 2, FRAME / 2
+    length = 13 + 1.0 * math.sin(t * math.pi / 2)
+    width = 3.4
+    half_l, half_w = length / 2, width / 2
+    pts = [
+        (cx + half_l, cy),                # right tip
+        (cx + half_l * 0.45, cy - half_w),
+        (cx - half_l * 0.45, cy - half_w),
+        (cx - half_l, cy),                # left tip
+        (cx - half_l * 0.45, cy + half_w),
+        (cx + half_l * 0.45, cy + half_w),
+    ]
+    d.polygon(pts, fill=WHITE)
+    return img
+
+
 def _overfit(t):
     """Overfit: a dense cluster of overlapping lobes -- the heaviest archetype."""
     img = _canvas()
@@ -198,7 +226,8 @@ def _overfit(t):
 
 
 # name -> per-frame drawing function. Names match the actor archetypes
-# (games/noise-floor/internal/actor/doc.go) plus "player".
+# (games/noise-floor/internal/actor/doc.go) plus "player" and "shot" (the
+# weapon projectile, Task 9b).
 ARCHETYPES = {
     "player": _player_chevron,
     "mote": _mote,
@@ -206,6 +235,7 @@ ARCHETYPES = {
     "aberrant": _aberrant,
     "lancer": _lancer,
     "overfit": _overfit,
+    "shot": _shot,
 }
 
 

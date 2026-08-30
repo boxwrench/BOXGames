@@ -2,7 +2,6 @@ package arena
 
 import (
 	"fmt"
-	"log/slog"
 	"math/rand"
 	"strings"
 	"time"
@@ -61,7 +60,7 @@ var spawnerCapacity = len(enemyArchetypes) * enemyCapacityPerArchetype
 // a real, host-backed SpriteSet, which the engine cannot construct without a
 // live GPU device.
 type spriteBank interface {
-	Acquire() (*render.Sprite, bool)
+	Acquire() (*render.Sprite, *spritesheet.Animator, bool)
 	Release(*render.Sprite)
 }
 
@@ -69,7 +68,12 @@ type spriteBank interface {
 // horde.Spawner pool handle. It has no counterpart in 7a's model because 7a
 // is pure logic with no rendering.
 type enemyView struct {
-	sprite   *render.Sprite
+	sprite *render.Sprite
+
+	// animator is borrowed from the sprite's SpriteSet slot, not owned here
+	// -- it shares the sprite's lifetime (Task 9b) rather than being
+	// allocated fresh per spawn, and Release (via despawnEnemy) returns both
+	// together by returning just the sprite.
 	animator *spritesheet.Animator
 
 	// archetype records which SpriteSet this view's sprite was borrowed
@@ -131,7 +135,7 @@ func (a *Arena) buildHorde(host *engine.Host) error {
 		// were authored against, so a renamed image inside the sidecar is
 		// caught here instead of silently loading stale art under the old
 		// name.
-		set, err := render.NewSpriteSet(host, atlas.Image, actor.StatsFor(arch).Size, enemyCapacityPerArchetype)
+		set, err := render.NewSpriteSet(host, atlas.Image, actor.StatsFor(arch).Size, enemyCapacityPerArchetype, atlas, "idle")
 		if err != nil {
 			return fmt.Errorf("arena: creating sprite set for %s: %w", arch.Name(), err)
 		}
@@ -166,33 +170,27 @@ func (a *Arena) updateHorde(dt float64) {
 }
 
 // spawnEnemy places one enemy of the given archetype on the spawn ring
-// (7a's Spawner.Spawn) and wires it to a borrowed sprite and a fresh
-// animator. It is a silent no-op if the enemy pool or that archetype's
-// sprite bank is exhausted -- an expected condition, not an error, and
-// exactly the case Horde sizing's comment above documents -- and it keeps
-// the two pools consistent by handing back whichever resource it did
-// acquire before giving up, via despawnEnemy.
+// (7a's Spawner.Spawn) and wires it to a borrowed sprite and animator. It is
+// a silent no-op if the enemy pool or that archetype's sprite bank is
+// exhausted -- an expected condition, not an error, and exactly the case
+// Horde sizing's comment above documents -- and it keeps the two pools
+// consistent by handing back whichever resource it did acquire before
+// giving up, via despawnEnemy.
+//
+// The animator comes back already reset to the idle clip's first frame --
+// SpriteSet.Acquire owns that reset (Task 9b) -- so a slot recycled from a
+// despawned enemy never resumes mid-animation from its previous occupant.
 func (a *Arena) spawnEnemy(arch actor.Archetype) {
 	handle, ok := a.spawner.Spawn(arch, a.Corruption.SafeRadius())
 	if !ok {
 		return
 	}
-	sprite, ok := a.spriteSets[arch].Acquire()
+	sprite, animator, ok := a.spriteSets[arch].Acquire()
 	if !ok {
 		a.despawnEnemy(handle)
 		return
 	}
-	// Recorded before the animator is created so despawnEnemy's unwind below
-	// can find the sprite and its archetype even if Play fails next.
-	a.enemyViews[handle] = enemyView{sprite: sprite, archetype: arch}
-
-	animator, err := newIdleAnimator(a.atlases[arch], arch.Name())
-	if err != nil {
-		slog.Error(err.Error(), "archetype", arch.Name())
-		a.despawnEnemy(handle)
-		return
-	}
-	a.enemyViews[handle].animator = animator
+	a.enemyViews[handle] = enemyView{sprite: sprite, animator: animator, archetype: arch}
 
 	enemy := a.spawner.Get(handle)
 	sprite.SetPosition(enemy.Pos)
