@@ -10,53 +10,6 @@ import (
 	"kaijuengine.com/matrix"
 )
 
-func TestBreathPhaseTurnsAroundAtFullInk(t *testing.T) {
-	if breathPhase(0.99, false) {
-		t.Fatalf("breathPhase(0.99, advancing) = true, want false: should keep advancing below full ink")
-	}
-	if !breathPhase(1.0, false) {
-		t.Fatalf("breathPhase(1.0, advancing) = false, want true: should start receding at full ink")
-	}
-}
-
-func TestBreathPhaseTurnsAroundAtCleanPage(t *testing.T) {
-	if !breathPhase(0.01, true) {
-		t.Fatalf("breathPhase(0.01, receding) = false, want true: should keep receding above clean")
-	}
-	if breathPhase(0, true) {
-		t.Fatalf("breathPhase(0, receding) = true, want false: should resume advancing at a clean page")
-	}
-}
-
-func TestBreathCycleCompletesBothDirections(t *testing.T) {
-	c := NewCorruption(safeRadiusMax, safeRadiusMin)
-	receding := false
-	sawFullInk, sawCleanAgain := false, false
-
-	// 40s at 60fps is comfortably more than one full cycle (~8.3s in, ~1.7s out).
-	for i := 0; i < 40*60; i++ {
-		if receding {
-			c.Recede(1.0 / 60.0)
-		} else {
-			c.Advance(1.0/60.0, 1.0)
-		}
-		level := c.Level()
-		receding = breathPhase(level, receding)
-		if level >= 1 {
-			sawFullInk = true
-		}
-		if sawFullInk && level <= 0 {
-			sawCleanAgain = true
-		}
-	}
-	if !sawFullInk {
-		t.Fatalf("corruption never reached full ink")
-	}
-	if !sawCleanAgain {
-		t.Fatalf("corruption reached full ink but never washed back to a clean page")
-	}
-}
-
 // colorEquals reports whether two colors match on every channel actorColor
 // touches (R, G, B — A is always 1 and not exercised here).
 func colorEquals(a, b matrix.Color) bool {

@@ -81,13 +81,12 @@ type Arena struct {
 	stain          *render.Stain
 	playerSprite   *render.Sprite
 	playerAnimator *spritesheet.Animator
-	receding       bool
 	updateID       engine.UpdateId
 
-	spawner    *horde.Spawner
-	rng        *rand.Rand
-	hordeView  *hordeView
-	spawnTimer float64
+	spawner   *horde.Spawner
+	rng       *rand.Rand
+	hordeView *hordeView
+	director  *horde.Director
 
 	weapon             *weapon.Weapon
 	battery            *weapon.Battery
@@ -128,17 +127,6 @@ func newIdleAnimator(atlas *spritesheet.Atlas, label string) (*spritesheet.Anima
 		return nil, fmt.Errorf("arena: %s atlas has no idle clip: %w", label, err)
 	}
 	return animator, nil
-}
-
-// breathPhase decides whether the demo loop should be washing the page back
-// this frame. Tasks 1-5 only ever advance, so the page reaches full ink in
-// ~8.3s and stays there; the wave director (Task 8) is what will really drive
-// this. Until then the arena breathes so there is something to watch.
-func breathPhase(level float32, receding bool) bool {
-	if receding {
-		return level > 0
-	}
-	return level >= 1
 }
 
 // actorColor returns the tint that keeps an actor legible against the ground
@@ -224,16 +212,22 @@ func New(host *engine.Host) (*Arena, error) {
 	return a, nil
 }
 
-// Update advances one frame. Corruption breathes in and out on a loop until the
-// wave director (Task 8) owns the pressure input for real.
+// Update advances one frame. The wave director decides what to spawn this
+// frame and the corruption pressure to apply: pressure rises through a wave,
+// holds at its peak while the field empties, then drops to 0 on clear, which
+// is what makes Corruption.Recede run instead of Advance -- the page washing
+// back is the reward for clearing a wave, not a demo loop.
 func (a *Arena) Update(dt float64) {
-	if a.receding {
+	spawns, pressure := a.director.Step(dt, a.spawner.Live())
+	for _, arch := range spawns {
+		a.spawnEnemy(arch)
+	}
+	if pressure == 0 {
 		a.Corruption.Recede(dt)
 	} else {
-		a.Corruption.Advance(dt, 1.0)
+		a.Corruption.Advance(dt, pressure)
 	}
 	level := a.Corruption.Level()
-	a.receding = breathPhase(level, a.receding)
 
 	a.stain.SetBoundary(stainPlaneRadius(a.Corruption.SafeRadius()), level)
 	a.Player.Update(actor.SampleMove(&a.host.Window.Keyboard), a.Corruption, dt)

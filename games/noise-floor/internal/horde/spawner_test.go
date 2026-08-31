@@ -115,6 +115,54 @@ func TestSpawnDeterministicWithSameSeed(t *testing.T) {
 	}
 }
 
+// TestSpawnDoesNotConsumeRngOnExhaustedPool confirms a failed Spawn (pool
+// full) does not draw from rng: Spawn must check pool capacity before
+// computing a ring angle, not after. A regression here would make spawn
+// positions diverge from an identically-seeded spawner that never attempted
+// the failed spawn.
+func TestSpawnDoesNotConsumeRngOnExhaustedPool(t *testing.T) {
+	const capacity = 2
+
+	withFailedAttempt := NewSpawner(capacity, rand.New(rand.NewSource(99)))
+	h1, ok := withFailedAttempt.Spawn(actor.Mote, 10)
+	if !ok {
+		t.Fatal("Spawn 1 failed unexpectedly")
+	}
+	if _, ok := withFailedAttempt.Spawn(actor.Mote, 10); !ok {
+		t.Fatal("Spawn 2 failed unexpectedly")
+	}
+	if _, ok := withFailedAttempt.Spawn(actor.Mote, 10); ok {
+		t.Fatal("Spawn on a full pool returned ok=true, want false")
+	}
+	withFailedAttempt.Despawn(h1)
+	h3, ok := withFailedAttempt.Spawn(actor.Mote, 10)
+	if !ok {
+		t.Fatal("Spawn after Despawn failed unexpectedly")
+	}
+	posWithFailedAttempt := withFailedAttempt.Get(h3).Pos
+
+	withoutFailedAttempt := NewSpawner(capacity, rand.New(rand.NewSource(99)))
+	h1b, ok := withoutFailedAttempt.Spawn(actor.Mote, 10)
+	if !ok {
+		t.Fatal("Spawn 1 failed unexpectedly")
+	}
+	if _, ok := withoutFailedAttempt.Spawn(actor.Mote, 10); !ok {
+		t.Fatal("Spawn 2 failed unexpectedly")
+	}
+	// No failed attempt here -- otherwise identical sequence.
+	withoutFailedAttempt.Despawn(h1b)
+	h3b, ok := withoutFailedAttempt.Spawn(actor.Mote, 10)
+	if !ok {
+		t.Fatal("Spawn after Despawn failed unexpectedly")
+	}
+	posWithoutFailedAttempt := withoutFailedAttempt.Get(h3b).Pos
+
+	if posWithFailedAttempt != posWithoutFailedAttempt {
+		t.Fatalf("positions diverged after a failed Spawn attempt: %v vs %v, want equal "+
+			"(a failed Spawn must not consume rng state)", posWithFailedAttempt, posWithoutFailedAttempt)
+	}
+}
+
 func TestSpawnSetsArchetypeAndHealth(t *testing.T) {
 	s := NewSpawner(4, rand.New(rand.NewSource(1)))
 	h, ok := s.Spawn(actor.Dendrite, 10)
@@ -147,6 +195,58 @@ func TestSpawnerEachVisitsAllLiveEnemies(t *testing.T) {
 	})
 	if seen != 5 {
 		t.Fatalf("Each visited %d enemies, want 5", seen)
+	}
+}
+
+// --- SpawnAt -----------------------------------------------------------
+//
+// SpawnAt is the explicit-position entry point used for enemies that appear
+// as a result of gameplay -- an Overfit's split children -- rather than the
+// wave director's ring placement. It shares Spawn's pool/health/reset logic
+// but skips ring placement entirely.
+
+func TestSpawnAtPlacesEnemyExactlyAtGivenPosition(t *testing.T) {
+	s := NewSpawner(4, rand.New(rand.NewSource(1)))
+	want := matrix.NewVec2(3.5, -2.25)
+	h, ok := s.SpawnAt(actor.Mote, want)
+	if !ok {
+		t.Fatal("SpawnAt failed unexpectedly")
+	}
+	e := s.Get(h)
+	if e == nil {
+		t.Fatal("Get after SpawnAt = nil")
+	}
+	if e.Pos != want {
+		t.Fatalf("Pos = %v, want exactly %v (SpawnAt must not perturb the given position)", e.Pos, want)
+	}
+}
+
+func TestSpawnAtSetsArchetypeAndHealth(t *testing.T) {
+	s := NewSpawner(4, rand.New(rand.NewSource(1)))
+	h, ok := s.SpawnAt(actor.Dendrite, matrix.NewVec2(0, 0))
+	if !ok {
+		t.Fatal("SpawnAt failed unexpectedly")
+	}
+	e := s.Get(h)
+	if e.Archetype != actor.Dendrite {
+		t.Fatalf("Archetype = %v, want Dendrite", e.Archetype)
+	}
+	want := actor.StatsFor(actor.Dendrite).Health
+	if e.Health != want {
+		t.Fatalf("Health = %d, want %d", e.Health, want)
+	}
+}
+
+func TestSpawnAtPoolExhaustionFails(t *testing.T) {
+	const capacity = 2
+	s := NewSpawner(capacity, rand.New(rand.NewSource(1)))
+	for i := 0; i < capacity; i++ {
+		if _, ok := s.SpawnAt(actor.Mote, matrix.NewVec2(0, 0)); !ok {
+			t.Fatalf("SpawnAt %d failed before pool was full", i)
+		}
+	}
+	if _, ok := s.SpawnAt(actor.Mote, matrix.NewVec2(0, 0)); ok {
+		t.Fatal("SpawnAt on a full pool returned ok=true, want false")
 	}
 }
 

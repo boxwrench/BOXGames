@@ -11,6 +11,7 @@ import (
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
 
 	"kaijuengine.com/engine"
+	"kaijuengine.com/matrix"
 )
 
 // Horde sizing.
@@ -30,21 +31,21 @@ import (
 // silently skipped (see spawnEnemy's doc comment); that is expected, correct
 // behaviour, not a case the two pools' agreement on totals rules out.
 //
-// spawnInterval is a TEMPORARY spawn cadence standing in for the wave
-// director; Task 8 replaces it with real wave scheduling.
-//
-// maxLiveEnemies caps how many enemies can be alive at once. Nothing kills
-// enemies yet (Task 10 owns damage and death), so without a cap the field
-// saturates in well under a minute at this cadence and the demo becomes a
-// solid wall of ink.
-const (
-	enemyCapacityPerArchetype = 32
-	spawnInterval             = 0.6
-	maxLiveEnemies            = 40
-)
+// The wave director (horde.Director, task-8b brief) replaces the old fixed
+// spawn cadence and live cap: the schedule's composition bounds how many
+// enemies are ever asked for. The largest wave (schedule wave 8: 12 Mote, 6
+// Lancer, 4 Aberrant, 3 Dendrite, 3 Overfit = 28) plus its worst-case Overfit
+// split children (up to SplitCount Motes per Overfit, so up to 9 more if all
+// 3 die at once while their siblings are still alive) tops out at 21
+// concurrent Motes -- comfortably under enemyCapacityPerArchetype (32) for
+// every archetype, so no capacity increase was needed here.
+const enemyCapacityPerArchetype = 32
 
-// enemyArchetypes is the closed set of horde archetypes, used both to size
-// spawnerCapacity and to pick a uniformly random archetype to spawn.
+// enemyArchetypes is the closed set of horde archetypes, used to size
+// spawnerCapacity and to build one sprite bank per archetype in buildHorde.
+// What to actually spawn, and when, is the wave director's job now
+// (horde.Director) -- this list no longer doubles as a pick-one-at-random
+// set the way it did under the old fixed-cadence stand-in.
 var enemyArchetypes = []actor.Archetype{
 	actor.Mote, actor.Dendrite, actor.Aberrant, actor.Lancer, actor.Overfit,
 }
@@ -53,36 +54,13 @@ var enemyArchetypes = []actor.Archetype{
 // enemyCapacityPerArchetype sprites per archetype.
 var spawnerCapacity = len(enemyArchetypes) * enemyCapacityPerArchetype
 
-// shouldSpawn decides whether the spawn timer has fired and there is still
-// room in the horde. timer is seconds accumulated since the last spawn;
-// interval is the spawn cadence; live/maxLive are the current and maximum
-// number of live enemies.
-func shouldSpawn(timer, interval float64, live, maxLive int) bool {
-	return timer >= interval && live < maxLive
-}
-
-// clampSpawnTimer bounds how far the spawn timer can bank credit while the
-// live cap is blocking spawns. Without this, spawnTimer accumulates every
-// frame regardless of whether shouldSpawn's live<maxLive gate ever lets that
-// credit be spent (see updateHorde: the -= spawnInterval that drains it only
-// runs inside the gated branch). That is harmless today because nothing
-// despawns, but once death lands, a long stretch at the cap would bank
-// enough credit to fire a spawn every frame until it drains -- an instant
-// burst refill instead of the intended cadence. Clamping to interval means a
-// slot opening later can release at most one banked spawn.
-func clampSpawnTimer(timer, interval float64, live, maxLive int) float64 {
-	if live >= maxLive && timer > interval {
-		return interval
-	}
-	return timer
-}
-
 // buildHorde wires up the enemy model (7a's Spawner) to rendering: one
 // render.SpriteSet and spritesheet.Atlas per archetype, and a fixed
 // per-handle slice of rendering state parallel to the spawner's pool.
 func (a *Arena) buildHorde(host *engine.Host) error {
 	a.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	a.spawner = horde.NewSpawner(spawnerCapacity, a.rng)
+	a.director = horde.NewDirector(horde.DefaultSchedule(), a.rng)
 	spriteSets := make(map[actor.Archetype]spriteBank, len(enemyArchetypes))
 
 	for _, arch := range enemyArchetypes {
@@ -112,18 +90,12 @@ func (a *Arena) buildHorde(host *engine.Host) error {
 	return nil
 }
 
-// updateHorde advances the temporary spawn cadence, steps the enemy
-// simulation (horde.Spawner.Step owns steering, integration and safe-zone
-// clamping), then syncs every live enemy's sprite to its new state.
+// updateHorde steps the enemy simulation (horde.Spawner.Step owns steering,
+// integration and safe-zone clamping), then syncs every live enemy's sprite
+// to its new state. It does not spawn -- Update calls the wave director and
+// spawns its release list before updateHorde runs, so a newly spawned
+// enemy's sprite still gets its first Sync the same frame it appears.
 func (a *Arena) updateHorde(dt float64) {
-	a.spawnTimer += dt
-	a.spawnTimer = clampSpawnTimer(a.spawnTimer, spawnInterval, a.spawner.Live(), maxLiveEnemies)
-	if shouldSpawn(a.spawnTimer, spawnInterval, a.spawner.Live(), maxLiveEnemies) {
-		a.spawnTimer -= spawnInterval
-		arch := enemyArchetypes[a.rng.Intn(len(enemyArchetypes))]
-		a.spawnEnemy(arch)
-	}
-
 	target := a.Player.Position()
 	a.spawner.Step(dt, target, a.Corruption)
 
@@ -162,4 +134,28 @@ func (a *Arena) spawnEnemy(arch actor.Archetype) {
 func (a *Arena) despawnEnemy(handle int) {
 	a.hordeView.Release(handle)
 	a.spawner.Despawn(handle)
+}
+
+// spawnOverfitSplits spawns actor.SplitCount Motes at actor.SplitPositions
+// around deathPos, the position an Overfit died at. These are extra spawns
+// outside the wave director's release list -- the director never sees them
+// -- but they land in the same shared horde.Spawner pool as every other
+// enemy, so they count toward horde.Spawner.Live() just the same: a wave the
+// director thinks it is clearing is not actually clear until they are dead
+// too.
+//
+// Each child follows spawnEnemy's acquire-or-unwind pattern independently: a
+// full pool or an exhausted Mote sprite bank silently skips that one child
+// (the same expected-not-error condition spawnEnemy documents) without
+// aborting the rest.
+func (a *Arena) spawnOverfitSplits(deathPos matrix.Vec2) {
+	for _, pos := range actor.SplitPositions(deathPos, actor.SplitRadius) {
+		handle, ok := a.spawner.SpawnAt(actor.Mote, pos)
+		if !ok {
+			continue
+		}
+		if !a.hordeView.Acquire(handle, actor.Mote) {
+			a.despawnEnemy(handle)
+		}
+	}
 }

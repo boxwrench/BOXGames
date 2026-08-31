@@ -3,11 +3,13 @@ package arena
 import (
 	"fmt"
 
+	"boxwrench.dev/boxgames/games/noisefloor/internal/actor"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/horde"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/weapon"
 
 	"kaijuengine.com/engine"
+	"kaijuengine.com/matrix"
 )
 
 // Combat sizing.
@@ -160,7 +162,20 @@ func (a *Arena) updateCombat(dt float64) {
 	a.hits = weapon.Collide(a.battery, a.targets, a.targetHandles, projectileSize, a.hits)
 	a.died = resolveHits(a.hits, a.died, a.battery, a.spawner)
 	for _, handle := range a.died {
+		// Read the dying enemy's identity before despawnEnemy returns its
+		// pool handle -- Overfit's split children (Task 8b brief) must
+		// spawn at its death position, which despawnEnemy would otherwise
+		// have already released.
+		e := a.spawner.Get(handle)
+		isOverfit := e != nil && e.Archetype == actor.Overfit
+		var deathPos matrix.Vec2
+		if isOverfit {
+			deathPos = e.Pos
+		}
 		a.despawnEnemy(handle)
+		if isOverfit {
+			a.spawnOverfitSplits(deathPos)
+		}
 	}
 
 	a.projectileView.Sync(dt, a.battery, a.Corruption.SafeRadius())

@@ -41,6 +41,17 @@ func (b *fakeSpriteBank) Acquire() (*render.Sprite, *spritesheet.Animator, bool)
 }
 
 func (b *fakeSpriteBank) Release(sp *render.Sprite) {
+	// A nil sprite panics here, mirroring what the real render.SpriteSet.
+	// Release does when it dereferences sp.index on a nil sprite. Without
+	// this, the fake's map-lookup no-op (b.live[nil] is simply false) would
+	// make TestHordeViewReleaseNeverAcquiredIsNoop pass even if
+	// hordeView.Release's `if view.sprite != nil` guard were deleted --
+	// which would panic for real against the production SpriteSet. See
+	// task-8b brief's carryover note: the director is the first code that
+	// releases handles around wave boundaries, so this matters here.
+	if sp == nil {
+		panic("fakeSpriteBank.Release: nil sprite")
+	}
 	if !b.live[sp] {
 		return
 	}
