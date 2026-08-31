@@ -89,6 +89,54 @@ func TestDirectorClearDetectionHoldsUntilLiveZero(t *testing.T) {
 	}
 }
 
+// TestDirectorDoesNotClearWhileReleasingThisFrame is a regression test for
+// the false-clear bug: releaseDue's rounding (due := int(windowElapsed /
+// SpawnWindow * n)) can never reach n while windowElapsed < SpawnWindow, so
+// releaseRest always flushes a wave's final release-list entries in the same
+// call that closes the spawn window -- which is the same call PhaseClearing
+// first evaluates live in. A wave must not be reported Cleared() on a call
+// that is itself handing the caller enemies to spawn: live is only the
+// caller's PRE-frame count, so it does not yet include what this call's
+// spawn is about to add to the field.
+func TestDirectorDoesNotClearWhileReleasingThisFrame(t *testing.T) {
+	waves := []Wave{
+		{Composition: map[actor.Archetype]int{actor.Mote: 1}, SpawnWindow: 1.0, PressurePeak: 1.5},
+		{Composition: map[actor.Archetype]int{actor.Mote: 1}, SpawnWindow: 1.0, PressurePeak: 1.5},
+	}
+	d := NewDirector(waves, rand.New(rand.NewSource(1)))
+
+	// Close the spawn window in one call. The caller reports live=0 -- the
+	// single Mote hasn't spawned before this call, so nothing is alive yet
+	// from the caller's point of view -- but releaseRest flushes it in this
+	// same call, so the field is about to gain exactly the enemy this wave
+	// was waiting to release.
+	spawn, _ := d.Step(1.0, 0)
+	if len(spawn) == 0 {
+		t.Fatal("spawn is empty on the window-closing call, want the wave's final entry released")
+	}
+	if d.Cleared() {
+		t.Fatal("Cleared() = true on the call that is itself releasing the wave's last enemy, want false: " +
+			"live is the caller's PRE-frame count and does not yet include this call's spawn")
+	}
+	if d.Phase() != PhaseClearing {
+		t.Fatalf("phase = %v, want PhaseClearing: window closed but the just-released enemy is still unaccounted for", d.Phase())
+	}
+
+	// Now the field is genuinely empty -- the caller has accounted for
+	// everything, including what the previous call just spawned -- so only
+	// now should the wave report clear.
+	spawn2, _ := d.Step(0.016, 0)
+	if len(spawn2) != 0 {
+		t.Fatalf("spawn = %v on the follow-up call, want none", spawn2)
+	}
+	if !d.Cleared() {
+		t.Fatal("Cleared() = false once live has genuinely reached 0 on a later call, want true")
+	}
+	if d.Phase() != PhaseLull {
+		t.Fatalf("phase = %v, want PhaseLull", d.Phase())
+	}
+}
+
 // --- pressure monotonicity -------------------------------------------------
 
 // TestDirectorPressureMonotonicWithinWave samples pressure across a spawn
@@ -201,32 +249,45 @@ func TestDirectorSpawnsShuffledNotGrouped(t *testing.T) {
 
 // --- overshoot carries across phase boundaries ------------------------------
 
-// TestDirectorOvershootFromSpawningCarriesThroughClearAndLull drives a single
-// Step call with a dt that finishes wave 1's window, clears it (live is
-// passed as 0), runs the whole lull, and lands partway into wave 2's window
-// -- all in one call. The leftover time must not be dropped at any boundary.
+// TestDirectorOvershootFromSpawningCarriesThroughClearAndLull drives wave 0
+// to its window close (a separate call: releaseRest flushes the wave's last
+// release-list entries in that same call, so per the false-clear fix -- see
+// TestDirectorDoesNotClearWhileReleasingThisFrame -- the wave cannot also
+// clear there, even with nothing else alive), then drives a single further
+// Step call with a dt that clears the wave, runs the whole lull, and lands
+// partway into wave 1's window -- all in one call. The leftover time must
+// not be dropped at any boundary.
 func TestDirectorOvershootFromSpawningCarriesThroughClearAndLull(t *testing.T) {
 	waves := []Wave{
 		{Composition: map[actor.Archetype]int{actor.Mote: 2}, SpawnWindow: 1.0, PressurePeak: 1.5},
-		{Composition: map[actor.Archetype]int{actor.Mote: 2}, SpawnWindow: 1.0, PressurePeak: 1.5},
+		{Composition: map[actor.Archetype]int{actor.Mote: 5}, SpawnWindow: 1.0, PressurePeak: 1.5},
 	}
 	d := NewDirector(waves, rand.New(rand.NewSource(1)))
 
-	spawn, pressure := d.Step(1.0+LullSeconds+0.4, 0)
+	spawn0, _ := d.Step(1.0, 0) // exhaust wave 0's window; releaseRest flushes it here
+	if len(spawn0) == 0 {
+		t.Fatal("spawn is empty on the window-closing call, want wave 0's composition released")
+	}
+	if d.Phase() != PhaseClearing {
+		t.Fatalf("phase after window exhausted = %v, want PhaseClearing (not yet cleared: this call "+
+			"is itself the one releasing wave 0's last enemies)", d.Phase())
+	}
+
+	spawn, pressure := d.Step(LullSeconds+0.4, 0)
 
 	if d.Phase() != PhaseSpawning || d.WaveIndex() != 1 {
 		t.Fatalf("phase=%v waveIndex=%d, want PhaseSpawning wave 1: overshoot must carry across the "+
-			"wave-1 clear, the whole lull, and into wave 2's window in a single call", d.Phase(), d.WaveIndex())
+			"wave-0 clear, the whole lull, and into wave 1's window in a single call", d.Phase(), d.WaveIndex())
 	}
 	if !d.Cleared() {
-		t.Fatal("Cleared() = false, want true: wave 1 cleared during this call")
+		t.Fatal("Cleared() = false, want true: wave 0 cleared during this call")
 	}
 	if pressure <= 1.0 {
-		t.Fatalf("pressure = %v after overshoot 0.4s into wave 2's window, want > 1.0: "+
+		t.Fatalf("pressure = %v after overshoot 0.4s into wave 1's window, want > 1.0: "+
 			"the leftover time after the lull must not be dropped", pressure)
 	}
 	if len(spawn) == 0 {
-		t.Fatal("spawn is empty, want wave 2's first release(s) already due 0.4s into its window")
+		t.Fatal("spawn is empty, want wave 1's first release(s) already due 0.4s into its window")
 	}
 }
 
@@ -242,9 +303,15 @@ func TestDirectorOvershootDtLargerThanWholeLullCarriesIntoNextWave(t *testing.T)
 	}
 	d := NewDirector(waves, rand.New(rand.NewSource(1)))
 
-	d.Step(0.5, 0) // exhaust window, clear immediately (live=0), enter PhaseLull
+	d.Step(0.5, 0) // exhaust the window; releaseRest flushes wave 0's one entry
+	// here, so per the false-clear fix (TestDirectorDoesNotClearWhileReleasingThisFrame)
+	// the clear cannot land in this same call even though live=0.
+	if d.Phase() != PhaseClearing {
+		t.Fatalf("phase after window exhausted = %v, want PhaseClearing", d.Phase())
+	}
+	d.Step(0, 0) // nothing pending this call; live=0 -> clears, enters PhaseLull
 	if d.Phase() != PhaseLull {
-		t.Fatalf("phase after wave 0 clear = %v, want PhaseLull", d.Phase())
+		t.Fatalf("phase after clear = %v, want PhaseLull", d.Phase())
 	}
 
 	spawn, pressure := d.Step(LullSeconds+0.3, 999) // dt alone bigger than the whole lull phase
@@ -270,7 +337,10 @@ func TestDirectorLullLastsExactDurationWithZeroPressure(t *testing.T) {
 		{Composition: map[actor.Archetype]int{actor.Mote: 1}, SpawnWindow: 0.5, PressurePeak: 1.5},
 	}
 	d := NewDirector(waves, rand.New(rand.NewSource(5)))
-	d.Step(0.5, 0)
+	d.Step(0.5, 0) // exhaust the window; releaseRest flushes the last entry here,
+	// so the clear lands one call later -- see
+	// TestDirectorDoesNotClearWhileReleasingThisFrame.
+	d.Step(0, 0) // nothing pending this call; live=0 -> clears into PhaseLull
 	if d.Phase() != PhaseLull {
 		t.Fatalf("phase = %v, want PhaseLull", d.Phase())
 	}

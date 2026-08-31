@@ -148,7 +148,18 @@ func (a *Arena) despawnEnemy(handle int) {
 // full pool or an exhausted Mote sprite bank silently skips that one child
 // (the same expected-not-error condition spawnEnemy documents) without
 // aborting the rest.
-func (a *Arena) spawnOverfitSplits(deathPos matrix.Vec2) {
+//
+// Unlike spawnEnemy, a successful Acquire here is followed by an immediate
+// hordeView.SyncOne rather than being left for updateHorde's Sync call to
+// reach "later in the same Update": this runs from updateCombat, which is
+// called from Arena.Update *after* updateHorde already ran for this frame,
+// so there is no later Sync sweep still to come this Update -- without the
+// immediate push, a split child would draw for one whole frame at its
+// recycled slot's stale position (the previous occupant's death spot, or
+// world origin for a never-used slot), at the most dramatic moment in the
+// game. safeRadius is passed in rather than read from a.Corruption directly
+// so this stays testable without one (see combat_test.go).
+func (a *Arena) spawnOverfitSplits(deathPos matrix.Vec2, safeRadius float32) {
 	for _, pos := range actor.SplitPositions(deathPos, actor.SplitRadius) {
 		handle, ok := a.spawner.SpawnAt(actor.Mote, pos)
 		if !ok {
@@ -156,6 +167,8 @@ func (a *Arena) spawnOverfitSplits(deathPos matrix.Vec2) {
 		}
 		if !a.hordeView.Acquire(handle, actor.Mote) {
 			a.despawnEnemy(handle)
+			continue
 		}
+		a.hordeView.SyncOne(handle, pos, safeRadius)
 	}
 }

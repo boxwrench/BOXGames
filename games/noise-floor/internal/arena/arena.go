@@ -222,9 +222,16 @@ func (a *Arena) Update(dt float64) {
 	for _, arch := range spawns {
 		a.spawnEnemy(arch)
 	}
-	if pressure == 0 {
+	// Recede exactly when the director isn't pressing pressure at all --
+	// PhaseLull and PhaseComplete, the two phases currentPressure holds at 0
+	// -- rather than branching on pressure == 0 itself. Pressure is a
+	// magnitude a wave could legitimately author as 0 (e.g. PressurePeak: 0),
+	// which would make that sentinel recede mid-wave; the phase is what
+	// actually means "recede" here.
+	switch a.director.Phase() {
+	case horde.PhaseLull, horde.PhaseComplete:
 		a.Corruption.Recede(dt)
-	} else {
+	default:
 		a.Corruption.Advance(dt, pressure)
 	}
 	level := a.Corruption.Level()

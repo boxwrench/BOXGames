@@ -5,6 +5,8 @@ import (
 	"boxwrench.dev/boxgames/games/noisefloor/internal/horde"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
 	"boxwrench.dev/boxgames/shared/spritesheet"
+
+	"kaijuengine.com/matrix"
 )
 
 // spriteBank is the subset of *render.SpriteSet that hordeView needs.
@@ -12,9 +14,16 @@ import (
 // directly) lets tests substitute a fake bank in place of a real,
 // host-backed SpriteSet, which the engine cannot construct without a live
 // GPU device.
+//
+// SyncOne is part of this interface, not called directly against
+// *render.Sprite/*spritesheet.Animator, for the same reason: a real Sprite's
+// SetPosition touches a GPU-backed entity that a test double cannot safely
+// stand in for (see fakeSpriteBank's doc comment), so the push has to be
+// something a fake can no-op.
 type spriteBank interface {
 	Acquire() (*render.Sprite, *spritesheet.Animator, bool)
 	Release(*render.Sprite)
+	SyncOne(sp *render.Sprite, an *spritesheet.Animator, pos matrix.Vec2, color matrix.Color)
 }
 
 // enemyView is the rendering state for one live enemy, indexed by its
@@ -81,6 +90,18 @@ func (v *hordeView) Release(handle int) {
 		v.spriteSets[view.archetype].Release(view.sprite)
 	}
 	v.enemyViews[handle] = enemyView{}
+}
+
+// SyncOne pushes position, current-frame UVs and tint for a single freshly
+// acquired handle immediately, rather than leaving it for the next per-frame
+// Sync sweep to reach. It is for a spawn that happens outside updateHorde's
+// once-per-frame hordeView.Sync call for this Update -- see
+// Arena.spawnOverfitSplits -- so its sprite is never drawn one frame at its
+// recycled slot's stale position (the previous occupant's death spot, or
+// world origin for a never-used slot).
+func (v *hordeView) SyncOne(handle int, pos matrix.Vec2, safeRadius float32) {
+	view := v.enemyViews[handle]
+	v.spriteSets[view.archetype].SyncOne(view.sprite, view.animator, pos, actorColor(pos, safeRadius))
 }
 
 // Sync pushes position, frame and tint for every live enemy.

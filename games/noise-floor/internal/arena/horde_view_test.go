@@ -6,6 +6,8 @@ import (
 	"boxwrench.dev/boxgames/games/noisefloor/internal/actor"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
 	"boxwrench.dev/boxgames/shared/spritesheet"
+
+	"kaijuengine.com/matrix"
 )
 
 // fakeSpriteBank is a minimal spriteBank double. render.SpriteSet cannot be
@@ -57,6 +59,14 @@ func (b *fakeSpriteBank) Release(sp *render.Sprite) {
 	}
 	delete(b.live, sp)
 	b.released = append(b.released, sp)
+}
+
+// SyncOne is a no-op: the fake never calls any Sprite or Animator method
+// (see the type doc comment) -- a real push would panic against the
+// zero-value Sprite and nil Animator this fake hands out, so the whole point
+// of routing hordeView.SyncOne through the spriteBank interface is that a
+// test double can decline to do it.
+func (b *fakeSpriteBank) SyncOne(sp *render.Sprite, an *spritesheet.Animator, pos matrix.Vec2, color matrix.Color) {
 }
 
 func (b *fakeSpriteBank) available() int { return b.capacity - len(b.live) }

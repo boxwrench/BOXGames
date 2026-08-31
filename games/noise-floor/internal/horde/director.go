@@ -27,7 +27,19 @@ const (
 // LullSeconds is how long the director holds PhaseLull -- pressure 0, page
 // receding -- between a wave clearing and the next wave's composition
 // starting to release.
-const LullSeconds = 3.0
+//
+// Deliberately short relative to how far the page can recede: arena's
+// recedeRate (world units/sec the page washes back at) against the arena's
+// safe-radius span (safeRadiusMax - safeRadiusMin, ~6.6 units) means the full
+// span recedes in ~2.2s. horde does not import arena (see the package
+// layering rule), so that relationship can't be enforced by a shared
+// constant -- it is only documented here. The intent is that a lull restores
+// roughly half the span, not all of it, so a wave that pushed deep leaves the
+// page visibly darker at the start of the next wave than a wave that barely
+// pushed at all -- corruption carries between waves instead of resetting to
+// a clean page every single lull, which would flatten the schedule's rising
+// difficulty ramp.
+const LullSeconds = 1.2
 
 // archetypeReleaseOrder fixes the order a wave's Composition is walked when
 // building its release list, so the pre-shuffle order (and therefore the
@@ -71,6 +83,14 @@ func NewDirector(waves []Wave, rng *rand.Rand) *Director {
 
 // Reset restarts the schedule at wave 0 with a freshly built (and freshly
 // shuffled) release list, and clears the Cleared() latch.
+//
+// This resets the schedule only. It does not touch anything already
+// spawned: live enemies (horde.Spawner) and their sprites (the arena's
+// hordeView) are both entirely outside the Director's knowledge, so calling
+// Reset alone leaves the field exactly as populated as it was the moment
+// before -- a caller that wants a clean "restart run" is responsible for
+// despawning every live enemy and releasing its sprite itself, separately.
+// There is no Arena-level reset yet.
 func (d *Director) Reset() {
 	d.waveIndex = 0
 	d.windowElapsed = 0
@@ -136,7 +156,18 @@ stepLoop:
 			d.phase = PhaseClearing
 
 		case PhaseClearing:
-			if live != 0 {
+			// live is the caller's PRE-frame count -- it does not include
+			// what this very call is about to hand back in d.spawnOut.
+			// releaseRest (in the PhaseSpawning case just above) always
+			// flushes a wave's last release-list entries in the same call
+			// that closes the spawn window -- releaseDue's rounding can
+			// never reach the full count while windowElapsed < SpawnWindow
+			// -- so the call that first reaches PhaseClearing is routinely
+			// also the call handing the caller its final spawns. A wave
+			// cannot be clear while it is still being handed enemies to
+			// spawn this frame, so gate on both: live plus whatever this
+			// call is about to release.
+			if live+len(d.spawnOut) != 0 {
 				break stepLoop
 			}
 			d.cleared = true

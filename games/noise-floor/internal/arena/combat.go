@@ -174,7 +174,7 @@ func (a *Arena) updateCombat(dt float64) {
 		}
 		a.despawnEnemy(handle)
 		if isOverfit {
-			a.spawnOverfitSplits(deathPos)
+			a.spawnOverfitSplits(deathPos, a.Corruption.SafeRadius())
 		}
 	}
 

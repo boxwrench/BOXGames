@@ -213,7 +213,7 @@ func TestSpawnOverfitSplitsSpawnsMotesAtExpectedPositions(t *testing.T) {
 	}
 
 	deathPos := matrix.NewVec2(3, 4)
-	a.spawnOverfitSplits(deathPos)
+	a.spawnOverfitSplits(deathPos, 10)
 
 	want := actor.SplitPositions(deathPos, actor.SplitRadius)
 	if got := a.spawner.Live(); got != len(want) {
@@ -246,7 +246,7 @@ func TestSpawnOverfitSplitsSkipsSilentlyWhenBankExhausted(t *testing.T) {
 		hordeView: newHordeView(map[actor.Archetype]spriteBank{actor.Mote: bank}, capacity),
 	}
 
-	a.spawnOverfitSplits(matrix.NewVec2(0, 0))
+	a.spawnOverfitSplits(matrix.NewVec2(0, 0), 10)
 
 	if got := a.spawner.Live(); got != 1 {
 		t.Fatalf("spawner.Live() with a 1-slot bank = %d, want 1 (only the first child acquires a sprite; the rest are skipped)", got)
