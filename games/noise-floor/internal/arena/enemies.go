@@ -9,7 +9,6 @@ import (
 	"boxwrench.dev/boxgames/games/noisefloor/internal/actor"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/horde"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
-	"boxwrench.dev/boxgames/shared/spritesheet"
 
 	"kaijuengine.com/engine"
 )
@@ -54,35 +53,6 @@ var enemyArchetypes = []actor.Archetype{
 // enemyCapacityPerArchetype sprites per archetype.
 var spawnerCapacity = len(enemyArchetypes) * enemyCapacityPerArchetype
 
-// spriteBank is the subset of *render.SpriteSet that despawnEnemy and
-// spawnEnemy need. Declaring it as an interface (rather than using
-// *render.SpriteSet directly) lets tests substitute a fake bank in place of
-// a real, host-backed SpriteSet, which the engine cannot construct without a
-// live GPU device.
-type spriteBank interface {
-	Acquire() (*render.Sprite, *spritesheet.Animator, bool)
-	Release(*render.Sprite)
-}
-
-// enemyView is the rendering state for one live enemy, indexed by its
-// horde.Spawner pool handle. It has no counterpart in 7a's model because 7a
-// is pure logic with no rendering.
-type enemyView struct {
-	sprite *render.Sprite
-
-	// animator is borrowed from the sprite's SpriteSet slot, not owned here
-	// -- it shares the sprite's lifetime (Task 9b) rather than being
-	// allocated fresh per spawn, and Release (via despawnEnemy) returns both
-	// together by returning just the sprite.
-	animator *spritesheet.Animator
-
-	// archetype records which SpriteSet this view's sprite was borrowed
-	// from, so despawnEnemy can return it without going through
-	// a.spawner.Get(handle).Archetype -- which returns nil once the handle
-	// is no longer live, i.e. exactly when despawnEnemy needs it most.
-	archetype actor.Archetype
-}
-
 // shouldSpawn decides whether the spawn timer has fired and there is still
 // room in the horde. timer is seconds accumulated since the last spawn;
 // interval is the spawn cadence; live/maxLive are the current and maximum
@@ -113,8 +83,7 @@ func clampSpawnTimer(timer, interval float64, live, maxLive int) float64 {
 func (a *Arena) buildHorde(host *engine.Host) error {
 	a.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	a.spawner = horde.NewSpawner(spawnerCapacity, a.rng)
-	a.enemyViews = make([]enemyView, spawnerCapacity)
-	a.spriteSets = make(map[actor.Archetype]spriteBank, len(enemyArchetypes))
+	spriteSets := make(map[actor.Archetype]spriteBank, len(enemyArchetypes))
 
 	for _, arch := range enemyArchetypes {
 		// The sidecar filename follows a fixed lowercase(Name())+".png"
@@ -137,8 +106,9 @@ func (a *Arena) buildHorde(host *engine.Host) error {
 		if err != nil {
 			return fmt.Errorf("arena: creating sprite set for %s: %w", arch.Name(), err)
 		}
-		a.spriteSets[arch] = set
+		spriteSets[arch] = set
 	}
+	a.hordeView = newHordeView(spriteSets, spawnerCapacity)
 	return nil
 }
 
@@ -157,59 +127,39 @@ func (a *Arena) updateHorde(dt float64) {
 	target := a.Player.Position()
 	a.spawner.Step(dt, target, a.Corruption)
 
-	safeRadius := a.Corruption.SafeRadius()
-	a.spawner.Each(func(handle int, e *horde.Enemy) {
-		view := &a.enemyViews[handle]
-		view.animator.Update(dt)
-		view.sprite.SetPosition(e.Pos)
-		view.sprite.SetUVs(view.animator.UVs())
-		view.sprite.SetColor(actorColor(e.Pos, safeRadius))
-	})
+	a.hordeView.Sync(dt, a.spawner, a.Corruption.SafeRadius())
 }
 
 // spawnEnemy places one enemy of the given archetype on the spawn ring
-// (7a's Spawner.Spawn) and wires it to a borrowed sprite and animator. It is
-// a silent no-op if the enemy pool or that archetype's sprite bank is
-// exhausted -- an expected condition, not an error, and exactly the case
-// Horde sizing's comment above documents -- and it keeps the two pools
-// consistent by handing back whichever resource it did acquire before
-// giving up, via despawnEnemy.
+// (horde.Spawner.Spawn) and wires it to a borrowed sprite and animator via
+// hordeView.Acquire. It is a silent no-op if the enemy pool or that
+// archetype's sprite bank is exhausted -- an expected condition, not an
+// error, and exactly the case Horde sizing's comment above documents -- and
+// it keeps the two pools consistent by handing back whichever resource it
+// did acquire before giving up, via despawnEnemy.
 //
-// The animator comes back already reset to the idle clip's first frame --
-// SpriteSet.Acquire owns that reset (Task 9b) -- so a slot recycled from a
-// despawned enemy never resumes mid-animation from its previous occupant.
+// The just-acquired sprite's position, frame and tint are left for
+// updateHorde's hordeView.Sync call (later in the same Update) to set --
+// Sync runs unconditionally over every live enemy, including one spawned
+// this frame, so setting them here would only be overwritten before the
+// frame is ever drawn.
 func (a *Arena) spawnEnemy(arch actor.Archetype) {
 	handle, ok := a.spawner.Spawn(arch, a.Corruption.SafeRadius())
 	if !ok {
 		return
 	}
-	sprite, animator, ok := a.spriteSets[arch].Acquire()
-	if !ok {
+	if !a.hordeView.Acquire(handle, arch) {
 		a.despawnEnemy(handle)
-		return
 	}
-	a.enemyViews[handle] = enemyView{sprite: sprite, animator: animator, archetype: arch}
-
-	enemy := a.spawner.Get(handle)
-	sprite.SetPosition(enemy.Pos)
-	sprite.SetUVs(animator.UVs())
-	sprite.SetColor(actorColor(enemy.Pos, a.Corruption.SafeRadius()))
 }
 
 // despawnEnemy releases everything one live enemy holds -- the pool handle,
-// its SpriteSet sprite, and its animator -- in the correct order. The sprite
-// is returned via the archetype recorded in enemyViews, not via
-// a.spawner.Get(handle).Archetype, which returns nil once the handle is no
-// longer live -- i.e. exactly when this unwind needs it. The animator has no
-// pool of its own; zeroing the view is enough to drop it.
+// its SpriteSet sprite, and its animator -- in the correct order: the view
+// (sprite and animator) first, via hordeView.Release, then the pool handle.
 //
 // It is called by resolveHits for every enemy killed in combat, and by
 // spawnEnemy's failure path when sprite acquisition fails.
 func (a *Arena) despawnEnemy(handle int) {
-	view := a.enemyViews[handle]
-	if view.sprite != nil {
-		a.spriteSets[view.archetype].Release(view.sprite)
-	}
-	a.enemyViews[handle] = enemyView{}
+	a.hordeView.Release(handle)
 	a.spawner.Despawn(handle)
 }
