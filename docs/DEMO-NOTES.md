@@ -2,6 +2,70 @@
 
 Notes taken while building, kept for the next demo. Newest session first.
 
+## 2026-08-30 (later) — The wave director
+
+Three tasks plus a tuning pass and a fix round. NOISE FLOOR now has a game loop: eight waves of
+rising composition and corruption pressure, cleared by emptying the field, each clear rewarded
+with a lull where the page washes back.
+
+### A test can enshrine a bug
+
+The headline defect this session: **every wave could false-clear.** The director tested the
+caller's pre-frame `live` count while the same call had just released the wave's final enemy —
+and it always released the final one on exactly that call, because `int(elapsed/window*n)` cannot
+reach `n` from inside the window. So the page receded as a reward for a wave that was not clear,
+and the next wave opened with a straggler.
+
+Two gates missed it. The 60-second trace's kill counts still matched composition totals exactly,
+because the leftover did spawn and did die — just counted against the following wave. And the
+test that should have caught it **asserted the buggy behaviour**: it passed `live=0` and expected
+both a pending spawn and a clear.
+
+That is the second time this session a test was the thing hiding a problem rather than catching
+it. A test that encodes current behaviour without asking whether that behaviour is *correct* is
+not coverage; it is a lock on the defect.
+
+### Two constants in different packages had a relationship nothing recorded
+
+`LullSeconds` (3.0) times `recedeRate` (3.0) restored 9 world units against a span of 6.6 — so
+every lull wiped the page completely and corruption never carried between waves. The schedule's
+carefully rising pressure did nothing across waves, because each one started from clean.
+
+Neither constant was wrong on its own, and they live in packages that do not import each other.
+Nothing said they were related. Now a comment does, and the lull restores about half the span, so
+deeper waves visibly darken the page going into the next.
+
+**Where two numbers in different files must agree, write down that they must.**
+
+### Deferred structural work, twice, and it paid twice
+
+`horde.Step` went first on one branch, the `Arena` state split first on the next. Both were
+recorded as *blocking prerequisites* attached to the task that needed them, not as backlog notes,
+and both landed clean with their own review. The alternative — folding a refactor into the task
+that needs it — buries a structural change inside a feature diff where no reviewer can see either
+clearly.
+
+The reviewer priced the second one at "an hour now, a day after juice and XP." That framing is
+what turned it from a nice-to-have into a scheduled task.
+
+### Dead code that was waiting to be used
+
+`actor.SplitPositions` was written and tested three tasks before anything called it. It is now
+what makes clear detection interesting: an Overfit's children count toward the field, so a wave
+is not clear until they die too. Building it early was right — but it sat as unreachable code for
+long enough that only the ledger remembered it existed.
+
+### Process notes
+
+- A schedule sized by arithmetic was still wrong by feel. The first run cleared waves correctly
+  with 0–2 enemies on screen — mathematically fine, visually empty. Tuning to 2.5–3× counts gave
+  a 3→15 ramp. **Correct and satisfying are different acceptance criteria**, and only one of them
+  shows up in a test.
+- Five implementers were killed mid-task by spend limits across the whole session; resuming
+  preserved context every time.
+- One implementer caught and fixed its own regression mid-task and wrote the test for it before
+  reporting.
+
 ## 2026-08-30 — Outlines, the horde seam, and combat
 
 Four tasks plus three fix rounds, each independently reviewed, then a whole-branch review.
