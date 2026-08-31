@@ -131,10 +131,10 @@ ink in about 8.3 seconds of real time, so aim by wall-clock, not frames.
 
 ## Risks worth knowing
 
-**There is no git remote.** The repo is local-only on `/dev/nvme1n1p1`. A reboot
-is fine — the disk is persistent — but a disk failure loses everything including
-the design spec and both plans. Pushing to a remote is a one-time cost worth
-paying before real implementation starts.
+~~**There is no git remote.**~~ Resolved 2026-08-30: `origin` is
+https://github.com/boxwrench/BOXGames.git and `main` tracks it. Push after
+merging a branch; the working tree carries no generated content, engine clone,
+binaries or `env.sh`, so a push is authored source only.
 
 **Visual output cannot be captured from outside the process.** This is a Wayland
 session (`XDG_SESSION_TYPE=wayland`) and the only capture tools installed,
