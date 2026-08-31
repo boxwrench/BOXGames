@@ -48,6 +48,11 @@ func NewSpawner(capacity int, rng *rand.Rand) *Spawner {
 // current safe radius. Returns the pool handle. ok is false when the pool is
 // exhausted — a full pool is an expected condition during a heavy wave, not
 // an error, and the caller simply gets no enemy.
+//
+// The pool is taken before the ring angle is drawn from rng, not after: a
+// failed Spawn must not consume rng state, or a spawner's positions would
+// diverge from an identically-seeded one that never happened to attempt a
+// spawn against a full pool.
 func (s *Spawner) Spawn(a actor.Archetype, safeRadius float32) (handle int, ok bool) {
 	item, h, ok := s.pool.Take()
 	if !ok {
@@ -56,13 +61,34 @@ func (s *Spawner) Spawn(a actor.Archetype, safeRadius float32) (handle int, ok b
 	angle := s.rng.Float64() * 2 * math.Pi
 	radius := float64(safeRadius + SpawnMargin)
 	pos := matrix.NewVec2(radius*math.Cos(angle), radius*math.Sin(angle))
+	initEnemy(item, a, pos)
+	return h, true
+}
 
+// SpawnAt places one enemy of the given archetype at an explicit position,
+// bypassing the spawn ring entirely. It exists for enemies that appear as a
+// result of gameplay rather than the wave director's composition -- an
+// Overfit's split children, placed at actor.SplitPositions around its death
+// position -- so it shares Spawn's pool-take and field-init logic without
+// Spawn's ring placement (and without ever touching rng). ok is false when
+// the pool is exhausted, the same expected, not-an-error condition as Spawn.
+func (s *Spawner) SpawnAt(a actor.Archetype, pos matrix.Vec2) (handle int, ok bool) {
+	item, h, ok := s.pool.Take()
+	if !ok {
+		return -1, false
+	}
+	initEnemy(item, a, pos)
+	return h, true
+}
+
+// initEnemy is Spawn and SpawnAt's shared field-init step, run only after a
+// successful pool.Take(); only the position comes from the caller.
+func initEnemy(item *Enemy, a actor.Archetype, pos matrix.Vec2) {
 	item.Archetype = a
 	item.Pos = pos
 	item.Health = actor.StatsFor(a).Health
 	item.Lancer = actor.LancerBrain{}
 	item.entered = false // a respawned slot must not inherit a stale latch
-	return h, true
 }
 
 // Each iterates live enemies.

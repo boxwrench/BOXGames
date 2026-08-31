@@ -9,9 +9,9 @@ import (
 	"boxwrench.dev/boxgames/games/noisefloor/internal/actor"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/horde"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
-	"boxwrench.dev/boxgames/shared/spritesheet"
 
 	"kaijuengine.com/engine"
+	"kaijuengine.com/matrix"
 )
 
 // Horde sizing.
@@ -25,27 +25,27 @@ import (
 // That is a total, not a per-archetype guarantee. The shared pool
 // (horde.Spawner) has no notion of archetype, so nothing stops it from
 // holding, say, 40 live Motes at once even though the Mote SpriteSet only
-// has enemyCapacityPerArchetype (32) sprites -- 32 live enemies of one
+// has enemyCapacityPerArchetype (48) sprites -- 32 live enemies of one
 // archetype among 40 total is entirely reachable. When that happens,
 // spawnEnemy's Acquire call on that archetype's bank fails and the spawn is
 // silently skipped (see spawnEnemy's doc comment); that is expected, correct
 // behaviour, not a case the two pools' agreement on totals rules out.
 //
-// spawnInterval is a TEMPORARY spawn cadence standing in for the wave
-// director; Task 8 replaces it with real wave scheduling.
-//
-// maxLiveEnemies caps how many enemies can be alive at once. Nothing kills
-// enemies yet (Task 10 owns damage and death), so without a cap the field
-// saturates in well under a minute at this cadence and the demo becomes a
-// solid wall of ink.
-const (
-	enemyCapacityPerArchetype = 32
-	spawnInterval             = 0.6
-	maxLiveEnemies            = 40
-)
+// The wave director (horde.Director, task-8b brief) replaces the old fixed
+// spawn cadence and live cap: the schedule's composition bounds how many
+// enemies are ever asked for. The largest wave (schedule wave 8: 26 Mote, 12
+// Lancer, 8 Aberrant, 5 Dendrite, 4 Overfit = 55 total) plus its worst-case
+// Overfit split children (up to SplitCount Motes per Overfit, so up to 12 more
+// if all 4 die at once while their siblings are still alive) would mean 38
+// concurrent Motes peak -- thus enemyCapacityPerArchetype (48) accommodates
+// Motes, and all other archetypes stay well under their limits.
+const enemyCapacityPerArchetype = 48
 
-// enemyArchetypes is the closed set of horde archetypes, used both to size
-// spawnerCapacity and to pick a uniformly random archetype to spawn.
+// enemyArchetypes is the closed set of horde archetypes, used to size
+// spawnerCapacity and to build one sprite bank per archetype in buildHorde.
+// What to actually spawn, and when, is the wave director's job now
+// (horde.Director) -- this list no longer doubles as a pick-one-at-random
+// set the way it did under the old fixed-cadence stand-in.
 var enemyArchetypes = []actor.Archetype{
 	actor.Mote, actor.Dendrite, actor.Aberrant, actor.Lancer, actor.Overfit,
 }
@@ -54,67 +54,14 @@ var enemyArchetypes = []actor.Archetype{
 // enemyCapacityPerArchetype sprites per archetype.
 var spawnerCapacity = len(enemyArchetypes) * enemyCapacityPerArchetype
 
-// spriteBank is the subset of *render.SpriteSet that despawnEnemy and
-// spawnEnemy need. Declaring it as an interface (rather than using
-// *render.SpriteSet directly) lets tests substitute a fake bank in place of
-// a real, host-backed SpriteSet, which the engine cannot construct without a
-// live GPU device.
-type spriteBank interface {
-	Acquire() (*render.Sprite, *spritesheet.Animator, bool)
-	Release(*render.Sprite)
-}
-
-// enemyView is the rendering state for one live enemy, indexed by its
-// horde.Spawner pool handle. It has no counterpart in 7a's model because 7a
-// is pure logic with no rendering.
-type enemyView struct {
-	sprite *render.Sprite
-
-	// animator is borrowed from the sprite's SpriteSet slot, not owned here
-	// -- it shares the sprite's lifetime (Task 9b) rather than being
-	// allocated fresh per spawn, and Release (via despawnEnemy) returns both
-	// together by returning just the sprite.
-	animator *spritesheet.Animator
-
-	// archetype records which SpriteSet this view's sprite was borrowed
-	// from, so despawnEnemy can return it without going through
-	// a.spawner.Get(handle).Archetype -- which returns nil once the handle
-	// is no longer live, i.e. exactly when despawnEnemy needs it most.
-	archetype actor.Archetype
-}
-
-// shouldSpawn decides whether the spawn timer has fired and there is still
-// room in the horde. timer is seconds accumulated since the last spawn;
-// interval is the spawn cadence; live/maxLive are the current and maximum
-// number of live enemies.
-func shouldSpawn(timer, interval float64, live, maxLive int) bool {
-	return timer >= interval && live < maxLive
-}
-
-// clampSpawnTimer bounds how far the spawn timer can bank credit while the
-// live cap is blocking spawns. Without this, spawnTimer accumulates every
-// frame regardless of whether shouldSpawn's live<maxLive gate ever lets that
-// credit be spent (see updateHorde: the -= spawnInterval that drains it only
-// runs inside the gated branch). That is harmless today because nothing
-// despawns, but once death lands, a long stretch at the cap would bank
-// enough credit to fire a spawn every frame until it drains -- an instant
-// burst refill instead of the intended cadence. Clamping to interval means a
-// slot opening later can release at most one banked spawn.
-func clampSpawnTimer(timer, interval float64, live, maxLive int) float64 {
-	if live >= maxLive && timer > interval {
-		return interval
-	}
-	return timer
-}
-
 // buildHorde wires up the enemy model (7a's Spawner) to rendering: one
 // render.SpriteSet and spritesheet.Atlas per archetype, and a fixed
 // per-handle slice of rendering state parallel to the spawner's pool.
 func (a *Arena) buildHorde(host *engine.Host) error {
 	a.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	a.spawner = horde.NewSpawner(spawnerCapacity, a.rng)
-	a.enemyViews = make([]enemyView, spawnerCapacity)
-	a.spriteSets = make(map[actor.Archetype]spriteBank, len(enemyArchetypes))
+	a.director = horde.NewDirector(horde.DefaultSchedule(), a.rng)
+	spriteSets := make(map[actor.Archetype]spriteBank, len(enemyArchetypes))
 
 	for _, arch := range enemyArchetypes {
 		// The sidecar filename follows a fixed lowercase(Name())+".png"
@@ -137,79 +84,91 @@ func (a *Arena) buildHorde(host *engine.Host) error {
 		if err != nil {
 			return fmt.Errorf("arena: creating sprite set for %s: %w", arch.Name(), err)
 		}
-		a.spriteSets[arch] = set
+		spriteSets[arch] = set
 	}
+	a.hordeView = newHordeView(spriteSets, spawnerCapacity)
 	return nil
 }
 
-// updateHorde advances the temporary spawn cadence, steps the enemy
-// simulation (horde.Spawner.Step owns steering, integration and safe-zone
-// clamping), then syncs every live enemy's sprite to its new state.
+// updateHorde steps the enemy simulation (horde.Spawner.Step owns steering,
+// integration and safe-zone clamping), then syncs every live enemy's sprite
+// to its new state. It does not spawn -- Update calls the wave director and
+// spawns its release list before updateHorde runs, so a newly spawned
+// enemy's sprite still gets its first Sync the same frame it appears.
 func (a *Arena) updateHorde(dt float64) {
-	a.spawnTimer += dt
-	a.spawnTimer = clampSpawnTimer(a.spawnTimer, spawnInterval, a.spawner.Live(), maxLiveEnemies)
-	if shouldSpawn(a.spawnTimer, spawnInterval, a.spawner.Live(), maxLiveEnemies) {
-		a.spawnTimer -= spawnInterval
-		arch := enemyArchetypes[a.rng.Intn(len(enemyArchetypes))]
-		a.spawnEnemy(arch)
-	}
-
 	target := a.Player.Position()
 	a.spawner.Step(dt, target, a.Corruption)
 
-	safeRadius := a.Corruption.SafeRadius()
-	a.spawner.Each(func(handle int, e *horde.Enemy) {
-		view := &a.enemyViews[handle]
-		view.animator.Update(dt)
-		view.sprite.SetPosition(e.Pos)
-		view.sprite.SetUVs(view.animator.UVs())
-		view.sprite.SetColor(actorColor(e.Pos, safeRadius))
-	})
+	a.hordeView.Sync(dt, a.spawner, a.Corruption.SafeRadius())
 }
 
 // spawnEnemy places one enemy of the given archetype on the spawn ring
-// (7a's Spawner.Spawn) and wires it to a borrowed sprite and animator. It is
-// a silent no-op if the enemy pool or that archetype's sprite bank is
-// exhausted -- an expected condition, not an error, and exactly the case
-// Horde sizing's comment above documents -- and it keeps the two pools
-// consistent by handing back whichever resource it did acquire before
-// giving up, via despawnEnemy.
+// (horde.Spawner.Spawn) and wires it to a borrowed sprite and animator via
+// hordeView.Acquire. It is a silent no-op if the enemy pool or that
+// archetype's sprite bank is exhausted -- an expected condition, not an
+// error, and exactly the case Horde sizing's comment above documents -- and
+// it keeps the two pools consistent by handing back whichever resource it
+// did acquire before giving up, via despawnEnemy.
 //
-// The animator comes back already reset to the idle clip's first frame --
-// SpriteSet.Acquire owns that reset (Task 9b) -- so a slot recycled from a
-// despawned enemy never resumes mid-animation from its previous occupant.
+// The just-acquired sprite's position, frame and tint are left for
+// updateHorde's hordeView.Sync call (later in the same Update) to set --
+// Sync runs unconditionally over every live enemy, including one spawned
+// this frame, so setting them here would only be overwritten before the
+// frame is ever drawn.
 func (a *Arena) spawnEnemy(arch actor.Archetype) {
 	handle, ok := a.spawner.Spawn(arch, a.Corruption.SafeRadius())
 	if !ok {
 		return
 	}
-	sprite, animator, ok := a.spriteSets[arch].Acquire()
-	if !ok {
+	if !a.hordeView.Acquire(handle, arch) {
 		a.despawnEnemy(handle)
-		return
 	}
-	a.enemyViews[handle] = enemyView{sprite: sprite, animator: animator, archetype: arch}
-
-	enemy := a.spawner.Get(handle)
-	sprite.SetPosition(enemy.Pos)
-	sprite.SetUVs(animator.UVs())
-	sprite.SetColor(actorColor(enemy.Pos, a.Corruption.SafeRadius()))
 }
 
 // despawnEnemy releases everything one live enemy holds -- the pool handle,
-// its SpriteSet sprite, and its animator -- in the correct order. The sprite
-// is returned via the archetype recorded in enemyViews, not via
-// a.spawner.Get(handle).Archetype, which returns nil once the handle is no
-// longer live -- i.e. exactly when this unwind needs it. The animator has no
-// pool of its own; zeroing the view is enough to drop it.
+// its SpriteSet sprite, and its animator -- in the correct order: the view
+// (sprite and animator) first, via hordeView.Release, then the pool handle.
 //
 // It is called by resolveHits for every enemy killed in combat, and by
 // spawnEnemy's failure path when sprite acquisition fails.
 func (a *Arena) despawnEnemy(handle int) {
-	view := a.enemyViews[handle]
-	if view.sprite != nil {
-		a.spriteSets[view.archetype].Release(view.sprite)
-	}
-	a.enemyViews[handle] = enemyView{}
+	a.hordeView.Release(handle)
 	a.spawner.Despawn(handle)
+}
+
+// spawnOverfitSplits spawns actor.SplitCount Motes at actor.SplitPositions
+// around deathPos, the position an Overfit died at. These are extra spawns
+// outside the wave director's release list -- the director never sees them
+// -- but they land in the same shared horde.Spawner pool as every other
+// enemy, so they count toward horde.Spawner.Live() just the same: a wave the
+// director thinks it is clearing is not actually clear until they are dead
+// too.
+//
+// Each child follows spawnEnemy's acquire-or-unwind pattern independently: a
+// full pool or an exhausted Mote sprite bank silently skips that one child
+// (the same expected-not-error condition spawnEnemy documents) without
+// aborting the rest.
+//
+// Unlike spawnEnemy, a successful Acquire here is followed by an immediate
+// hordeView.SyncOne rather than being left for updateHorde's Sync call to
+// reach "later in the same Update": this runs from updateCombat, which is
+// called from Arena.Update *after* updateHorde already ran for this frame,
+// so there is no later Sync sweep still to come this Update -- without the
+// immediate push, a split child would draw for one whole frame at its
+// recycled slot's stale position (the previous occupant's death spot, or
+// world origin for a never-used slot), at the most dramatic moment in the
+// game. safeRadius is passed in rather than read from a.Corruption directly
+// so this stays testable without one (see combat_test.go).
+func (a *Arena) spawnOverfitSplits(deathPos matrix.Vec2, safeRadius float32) {
+	for _, pos := range actor.SplitPositions(deathPos, actor.SplitRadius) {
+		handle, ok := a.spawner.SpawnAt(actor.Mote, pos)
+		if !ok {
+			continue
+		}
+		if !a.hordeView.Acquire(handle, actor.Mote) {
+			a.despawnEnemy(handle)
+			continue
+		}
+		a.hordeView.SyncOne(handle, pos, safeRadius)
+	}
 }

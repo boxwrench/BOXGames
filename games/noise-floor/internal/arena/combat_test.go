@@ -7,6 +7,8 @@ import (
 	"boxwrench.dev/boxgames/games/noisefloor/internal/actor"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/horde"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/weapon"
+
+	"kaijuengine.com/matrix"
 )
 
 // --- refillTargets ----------------------------------------------------
@@ -188,5 +190,65 @@ func TestResolveHitsSameEnemyTwiceInOneFrameDiesOnce(t *testing.T) {
 	}
 	if b.Live() != 0 {
 		t.Fatalf("battery.Live() after resolveHits = %d, want 0 (both projectiles despawned)", b.Live())
+	}
+}
+
+// --- spawnOverfitSplits --------------------------------------------------
+//
+// The task-8b brief's SplitPositions wiring test: an Overfit death produces
+// actor.SplitCount Motes at actor.SplitPositions' expected positions. These
+// are extra spawns outside the wave director's release list, but they must
+// count toward horde.Spawner.Live() -- spawnOverfitSplits achieves that for
+// free by going through the same shared pool every other enemy uses.
+
+// TestSpawnOverfitSplitsSpawnsMotesAtExpectedPositions confirms the split
+// children are exactly actor.SplitCount live Motes, at exactly the positions
+// actor.SplitPositions computes for the given death position.
+func TestSpawnOverfitSplitsSpawnsMotesAtExpectedPositions(t *testing.T) {
+	const capacity = 16
+	bank := newFakeSpriteBank(8)
+	a := &Arena{
+		spawner:   horde.NewSpawner(capacity, rand.New(rand.NewSource(1))),
+		hordeView: newHordeView(map[actor.Archetype]spriteBank{actor.Mote: bank}, capacity),
+	}
+
+	deathPos := matrix.NewVec2(3, 4)
+	a.spawnOverfitSplits(deathPos, 10)
+
+	want := actor.SplitPositions(deathPos, actor.SplitRadius)
+	if got := a.spawner.Live(); got != len(want) {
+		t.Fatalf("spawner.Live() after spawnOverfitSplits = %d, want %d (actor.SplitCount)", got, len(want))
+	}
+
+	gotPositions := map[matrix.Vec2]int{}
+	a.spawner.Each(func(handle int, e *horde.Enemy) {
+		if e.Archetype != actor.Mote {
+			t.Fatalf("split child archetype = %v, want Mote", e.Archetype)
+		}
+		gotPositions[e.Pos]++
+	})
+	for _, p := range want {
+		if gotPositions[p] != 1 {
+			t.Fatalf("expected exactly one split child at %v, got %d (all positions: %v)", p, gotPositions[p], gotPositions)
+		}
+	}
+}
+
+// TestSpawnOverfitSplitsSkipsSilentlyWhenBankExhausted confirms a split
+// spawn that cannot acquire a sprite (archetype bank exhausted) is a silent
+// skip -- the same expected-not-error condition spawnEnemy documents -- and
+// does not panic or leave a half-acquired pool handle live without a view.
+func TestSpawnOverfitSplitsSkipsSilentlyWhenBankExhausted(t *testing.T) {
+	const capacity = 16
+	bank := newFakeSpriteBank(1) // room for only one of SplitCount children
+	a := &Arena{
+		spawner:   horde.NewSpawner(capacity, rand.New(rand.NewSource(1))),
+		hordeView: newHordeView(map[actor.Archetype]spriteBank{actor.Mote: bank}, capacity),
+	}
+
+	a.spawnOverfitSplits(matrix.NewVec2(0, 0), 10)
+
+	if got := a.spawner.Live(); got != 1 {
+		t.Fatalf("spawner.Live() with a 1-slot bank = %d, want 1 (only the first child acquires a sprite; the rest are skipped)", got)
 	}
 }

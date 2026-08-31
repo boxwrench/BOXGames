@@ -5,6 +5,7 @@ import (
 
 	"boxwrench.dev/boxgames/shared/spritesheet"
 	"kaijuengine.com/engine"
+	"kaijuengine.com/matrix"
 )
 
 // SpriteSet is a fixed bank of sprites sharing one atlas, all created up
@@ -93,6 +94,18 @@ func (s *SpriteSet) Acquire() (sp *Sprite, an *spritesheet.Animator, ok bool) {
 // cannot fail here.
 func resetAnimatorForAcquire(an *spritesheet.Animator, clip string) {
 	_ = an.Play(clip)
+}
+
+// SyncOne pushes position, current-frame UVs and tint for one sprite/
+// animator pair this set has already handed out via Acquire. It exists for a
+// caller that spawns outside the normal once-per-frame sweep that visits
+// every live sprite (see arena.hordeView.Sync) and needs its new sprite
+// drawn correctly the very frame it is acquired, rather than for one extra
+// frame at wherever its recycled slot last was.
+func (s *SpriteSet) SyncOne(sp *Sprite, an *spritesheet.Animator, pos matrix.Vec2, color matrix.Color) {
+	sp.SetPosition(pos)
+	sp.SetUVs(an.UVs())
+	sp.SetColor(color)
 }
 
 // At returns the sprite and animator at positional index i directly,

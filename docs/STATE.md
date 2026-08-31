@@ -1,6 +1,6 @@
 # Where things stand
 
-Last updated: 2026-08-30 (after combat; three branches merged to main). Update this when the state below stops being true.
+Last updated: 2026-08-30 (after the wave director; four branches merged, pushed to origin). Update this when the state below stops being true.
 
 ## Cold start
 
@@ -23,7 +23,7 @@ Verified from an empty environment (`env -i`, no `PATH` additions, no
 | --- | --- |
 | Monorepo scaffold, workspace, build scripts | Working |
 | `make bootstrap / build / run / test / vet / fmt / clean` | Working |
-| NOISE FLOOR binary | Playable, and now a game loop. Cream page, corruption boundary eating inward, BX-77 under WASD, five enemy archetypes walking in out of the ink, and an auto-firing weapon that kills them. ~12-14 kills per 15s with one weapon. No waves, juice, or XP yet. |
+| NOISE FLOOR binary | A game. Eight waves with rising composition and corruption pressure, clear detection, a lull where the page washes back as the reward, and Overfit splits. Peak field 3→15 live across waves; ~5 waves cleared in 90s with one weapon. No juice or XP yet. |
 | `shared/palette`, `shared/pool` | Implemented, tested |
 | `shared/kaijuboot` layered content database | Implemented |
 | `shared/spritesheet` | Implemented: sheet schema, atlas loader, UV conversion, per-entity animator. Replaces the engine's broken sprite path. |
@@ -56,22 +56,27 @@ All of it is on `main`. Two branches were merged: `feat/noise-floor-gameplay`
 
 Iteration notes for the next demo: [DEMO-NOTES.md](DEMO-NOTES.md).
 
-### One blocking prerequisite
+### No blocking prerequisites
 
-**Before the wave director: split state out of `Arena`.** `Arena` is now 22 fields and owns
-engine framing, horde presentation, projectile presentation, simulation orchestration, and a
-stand-in spawn director. The three-file split (`arena.go`, `enemies.go`, `combat.go`) is the
-right *file* split but not a *state* split. Extract `hordeView{spriteSets, enemyViews}` and
-`projectileView{set, sprites, live}`, each with its own `Sync`, and leave `Arena.Update` as pure
-orchestration.
+The `Arena` state split is done — `hordeView` and `projectileView` own their own
+presentation state and `Arena.Update` is pure orchestration. Both earlier
+prerequisites (pool the animator before death; split state before the director)
+are closed.
 
-The whole-branch reviewer put the cost plainly: an hour now, a day after juice and XP land on
-top. The director has to tear `updateHorde` apart anyway. Do it as the director branch's first
-commit, exactly as `horde.Step` was the first commit of the branch before it — that pattern
-worked well twice now.
+### Carry into the juice task
 
-The earlier prerequisite (pool the animator before death lands) is **done** — `SpriteSet` now
-pre-creates an animator per slot and hands both out together.
+- **Extract `onEnemyDeath(handle)`.** The death path in `combat.go` already reads
+  the enemy before despawning, so archetype and position are in hand for XP and
+  shard bursts — but the Overfit branch is inline there and will accrete.
+- **A hit-flash timer belongs on `enemyView`.** `hordeView.Sync` sets tint
+  unconditionally from `actorColor`, so a flash must be *composed* there rather
+  than written to the sprite from outside, or `Sync` will overwrite it.
+- **`fakeSpriteBank` has no-op methods that record nothing.** `Release` and
+  `SyncOne` both no-op in the fake while the real `SpriteSet` acts, so tests
+  through it can pass against production code that is wrong. This has already
+  produced one test that proved nothing. Make the fake record its calls.
+- **A `playerView` earns its keep once the player has hit flash or i-frames** —
+  until then it would wrap two fields and four lines.
 
 ### Then
 
@@ -131,10 +136,10 @@ ink in about 8.3 seconds of real time, so aim by wall-clock, not frames.
 
 ## Risks worth knowing
 
-**There is no git remote.** The repo is local-only on `/dev/nvme1n1p1`. A reboot
-is fine — the disk is persistent — but a disk failure loses everything including
-the design spec and both plans. Pushing to a remote is a one-time cost worth
-paying before real implementation starts.
+~~**There is no git remote.**~~ Resolved 2026-08-30: `origin` is
+https://github.com/boxwrench/BOXGames.git and `main` tracks it. Push after
+merging a branch; the working tree carries no generated content, engine clone,
+binaries or `env.sh`, so a push is authored source only.
 
 **Visual output cannot be captured from outside the process.** This is a Wayland
 session (`XDG_SESSION_TYPE=wayland`) and the only capture tools installed,

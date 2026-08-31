@@ -3,12 +3,13 @@ package arena
 import (
 	"fmt"
 
+	"boxwrench.dev/boxgames/games/noisefloor/internal/actor"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/horde"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/render"
 	"boxwrench.dev/boxgames/games/noisefloor/internal/weapon"
-	"boxwrench.dev/boxgames/shared/spritesheet"
 
 	"kaijuengine.com/engine"
+	"kaijuengine.com/matrix"
 )
 
 // Combat sizing.
@@ -35,8 +36,8 @@ const (
 	projectileTextureKey = "shot.png"
 
 	// projectileClip is the only animation clip a shot plays. Named so
-	// buildCombat's NewSpriteSet call and updateCombat's per-fire reset (see
-	// resetProjectileAnimator) cannot drift apart.
+	// buildCombat's NewSpriteSet call and projectileView.Fired's per-fire
+	// reset (see resetProjectileAnimator) cannot drift apart.
 	projectileClip = "idle"
 
 	// projectileLifeMargin multiplies the time a shot needs to cross the
@@ -71,27 +72,10 @@ func (a *Arena) buildCombat(host *engine.Host) error {
 		return fmt.Errorf("arena: creating sprite set for shot: %w", err)
 	}
 
-	// The projectile battery's pool handles are dense indices in
-	// [0, projectileCapacity), matching the SpriteSet's own slot indices one
-	// for one, so a projectile's sprite can be addressed directly by its
-	// battery handle via SpriteSet.At rather than by acquiring and releasing
-	// through the free list. That sidesteps a real mismatch: Battery.Step
-	// expires projectiles whose Life has run out internally and reports no
-	// handles for it, so a second Acquire/Release lifecycle here could never
-	// stay in lockstep with the battery's own pool. Sprites are addressed
-	// positionally by battery handle for their whole lifetime; visibility is
-	// synced directly by syncProjectiles every frame instead (see below),
-	// and updateCombat resets a slot's animator itself when a shot reuses it
-	// (see resetProjectileAnimator) since At bypasses Acquire's own reset.
-	a.projectileSprites = make([]*render.Sprite, projectileCapacity)
-	a.projectileAnimators = make([]*spritesheet.Animator, projectileCapacity)
-	a.projectileLive = make([]bool, projectileCapacity)
-	for i := 0; i < projectileCapacity; i++ {
-		sp, an := set.At(i)
-		sp.Hide() // re-shown per frame by syncProjectiles for whichever slots are live
-		a.projectileSprites[i] = sp
-		a.projectileAnimators[i] = an
-	}
+	// See projectileView's doc comment for why projectile sprites are
+	// addressed positionally by battery handle via SpriteSet.At rather than
+	// acquired and released through the free list.
+	a.projectileView = newProjectileView(set, projectileCapacity)
 
 	a.targets = make([]weapon.Target, 0, spawnerCapacity)
 	a.targetHandles = make([]int, 0, spawnerCapacity)
@@ -141,18 +125,6 @@ func resolveHits(hits []weapon.Hit, died []int, battery *weapon.Battery, spawner
 	return died
 }
 
-// resetProjectileAnimator restarts handle's animator on projectileClip. It
-// exists because projectile sprites are addressed positionally (see
-// buildCombat) rather than acquired through SpriteSet.Acquire, which is what
-// normally resets a reused slot's animator to frame 0 -- without this, a
-// slot recycled from an earlier, expired shot would resume mid-animation
-// instead of starting fresh. Invisible today on projectileClip's 4-frame
-// looping idle clip, but load-bearing the moment a shot gets its own
-// spawn or impact clip.
-func resetProjectileAnimator(an *spritesheet.Animator) {
-	_ = an.Play(projectileClip) // projectileClip was already validated by buildCombat's own Play call, so this cannot fail
-}
-
 // updateCombat runs the fire -> move -> collide -> damage -> die loop for
 // one frame. Called after updateHorde, so damage resolves after the horde's
 // motion this frame: at 60fps a shot (speed 16) covers 0.27 world units per
@@ -161,7 +133,7 @@ func resetProjectileAnimator(an *spritesheet.Animator) {
 // single frame -- but that is a framerate-dependent assumption, not a
 // guarantee: the margin is gone by ~24fps (0.67 units/frame), and there is
 // no swept collision check backing it up. A hit despawns its projectile
-// before that projectile is drawn (syncProjectiles runs last), so a dead
+// before that projectile is drawn (projectileView.Sync runs last), so a dead
 // shot never renders for one extra frame.
 func (a *Arena) updateCombat(dt float64) {
 	a.targets, a.targetHandles = refillTargets(a.spawner, a.targets, a.targetHandles)
@@ -179,7 +151,7 @@ func (a *Arena) updateCombat(dt float64) {
 			// weapon must not consume its cooldown for a shot that never
 			// left the barrel -- it simply tries again next frame.
 			if handle, ok := a.battery.Fire(a.Player.Position(), a.targets[idx].Position(), spec.Speed, spec.Damage, life); ok {
-				resetProjectileAnimator(a.projectileAnimators[handle])
+				a.projectileView.Fired(handle)
 				a.weapon.Consume()
 			}
 		}
@@ -190,36 +162,21 @@ func (a *Arena) updateCombat(dt float64) {
 	a.hits = weapon.Collide(a.battery, a.targets, a.targetHandles, projectileSize, a.hits)
 	a.died = resolveHits(a.hits, a.died, a.battery, a.spawner)
 	for _, handle := range a.died {
+		// Read the dying enemy's identity before despawnEnemy returns its
+		// pool handle -- Overfit's split children (Task 8b brief) must
+		// spawn at its death position, which despawnEnemy would otherwise
+		// have already released.
+		e := a.spawner.Get(handle)
+		isOverfit := e != nil && e.Archetype == actor.Overfit
+		var deathPos matrix.Vec2
+		if isOverfit {
+			deathPos = e.Pos
+		}
 		a.despawnEnemy(handle)
-	}
-
-	a.syncProjectiles(dt)
-}
-
-// syncProjectiles positions and shows every live projectile's sprite, and
-// hides every slot with no live projectile this frame -- including one that
-// was live last frame and has since despawned (by collision, above, or by
-// expiring inside Battery.Step, which reports no handles for that). Full
-// resync every frame, rather than tracking a delta, is what makes that
-// second case correct without Battery exposing which handles it expired.
-func (a *Arena) syncProjectiles(dt float64) {
-	for i := range a.projectileLive {
-		a.projectileLive[i] = false
-	}
-	safeRadius := a.Corruption.SafeRadius()
-	a.battery.Each(func(handle int, p *weapon.Projectile) {
-		a.projectileLive[handle] = true
-		an := a.projectileAnimators[handle]
-		sp := a.projectileSprites[handle]
-		an.Update(dt)
-		sp.SetPosition(p.Pos)
-		sp.SetUVs(an.UVs())
-		sp.SetColor(actorColor(p.Pos, safeRadius))
-		sp.Show()
-	})
-	for i, live := range a.projectileLive {
-		if !live {
-			a.projectileSprites[i].Hide()
+		if isOverfit {
+			a.spawnOverfitSplits(deathPos, a.Corruption.SafeRadius())
 		}
 	}
+
+	a.projectileView.Sync(dt, a.battery, a.Corruption.SafeRadius())
 }
