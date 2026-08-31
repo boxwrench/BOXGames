@@ -25,7 +25,7 @@ import (
 // That is a total, not a per-archetype guarantee. The shared pool
 // (horde.Spawner) has no notion of archetype, so nothing stops it from
 // holding, say, 40 live Motes at once even though the Mote SpriteSet only
-// has enemyCapacityPerArchetype (32) sprites -- 32 live enemies of one
+// has enemyCapacityPerArchetype (48) sprites -- 32 live enemies of one
 // archetype among 40 total is entirely reachable. When that happens,
 // spawnEnemy's Acquire call on that archetype's bank fails and the spawn is
 // silently skipped (see spawnEnemy's doc comment); that is expected, correct
@@ -33,13 +33,13 @@ import (
 //
 // The wave director (horde.Director, task-8b brief) replaces the old fixed
 // spawn cadence and live cap: the schedule's composition bounds how many
-// enemies are ever asked for. The largest wave (schedule wave 8: 12 Mote, 6
-// Lancer, 4 Aberrant, 3 Dendrite, 3 Overfit = 28) plus its worst-case Overfit
-// split children (up to SplitCount Motes per Overfit, so up to 9 more if all
-// 3 die at once while their siblings are still alive) tops out at 21
-// concurrent Motes -- comfortably under enemyCapacityPerArchetype (32) for
-// every archetype, so no capacity increase was needed here.
-const enemyCapacityPerArchetype = 32
+// enemies are ever asked for. The largest wave (schedule wave 8: 26 Mote, 12
+// Lancer, 8 Aberrant, 5 Dendrite, 4 Overfit = 55 total) plus its worst-case
+// Overfit split children (up to SplitCount Motes per Overfit, so up to 12 more
+// if all 4 die at once while their siblings are still alive) would mean 38
+// concurrent Motes peak -- thus enemyCapacityPerArchetype (48) accommodates
+// Motes, and all other archetypes stay well under their limits.
+const enemyCapacityPerArchetype = 48
 
 // enemyArchetypes is the closed set of horde archetypes, used to size
 // spawnerCapacity and to build one sprite bank per archetype in buildHorde.
