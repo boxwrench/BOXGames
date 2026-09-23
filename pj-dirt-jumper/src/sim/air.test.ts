@@ -161,6 +161,11 @@ test("landing reports the air's tricks", () => {
     { kind: "grab", grab: 0, seconds: 0.5, releasedAt: NaN },
   ]);
 });
+test("landing any trick kicks in a little extra speed", () => {
+  const plain = touchdown(-0.5, 0).r.v,
+    flipped = touchdown(-0.5, 0, { flips: 1, spun: TAU }).r.v;
+  assert.ok(Math.abs(flipped - plain - T.trickSpeed) < 1e-9);
+});
 test("Flow raises the speed cap pumping can reach", () => {
   // Steep enough that pumping could exceed the raised cap, shallow enough that gravity alone can't.
   const down = line(-0.15),

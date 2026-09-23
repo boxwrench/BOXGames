@@ -30,10 +30,11 @@ test("pumping an upslope bleeds speed", () => {
   const up = line(0.4);
   assert.ok(ride(up, PUMP, 1, 12).r.v < ride(up, NO_ACTIONS, 1, 12).r.v - 1);
 });
-test("on the flat, pumping does nothing and friction slows you", () => {
+test("on the flat, pumping helps a little but never keeps PJ going", () => {
   const flat = line(0);
-  assert.equal(ride(flat, PUMP, 2).r.v, ride(flat, NO_ACTIONS, 2).r.v);
+  assert.ok(ride(flat, PUMP, 2).r.v > ride(flat, NO_ACTIONS, 2).r.v + 0.5);
   assert.ok(ride(flat, NO_ACTIONS, 2).r.v < 7);
+  for (const v of [2, 8, 20]) assert.ok(ride(flat, PUMP, 1, v).r.v < v, `still slows from ${v} m/s`);
 });
 test("pumping can't push past maxSpeed", () => {
   assert.ok(ride(line(-0.1), NO_ACTIONS, 30).r.v < T.maxSpeed - 2);

@@ -30,10 +30,10 @@ Land with the bike lined up with the slope; let go of grabs before touchdown. **
 
 ## Deep water
 
-Going further pays. Milestones at 300, 600, 1,000, 1,500, 2,000, 2,600, 3,300, 4,000 m (then every 800 m) pay a growing bonus and raise the depth multiplier (up to ×2). Each summons an omen, stranger the deeper you go: Bobber Moon, a Proud Bluegill ("I'm proud of you, son." — then he keeps dropping by as Dad Bluegill with 1950s advice), It's Raining Bait (catch fish with your face), a Land Trout, the Bass God (lightning, ×2 score), The Sky Is a Lake, and a giant hook fishing for you. Dev: `game.summon("bassGod")`, `node scripts/omens.mjs`, `node scripts/art.mjs`.
+Going further pays. Milestones at 300, 600, 1,000, 1,500, 2,000, 2,600, 3,300, 4,000 m (then every 800 m) pay a growing bonus and raise the depth multiplier (up to ×2). Each summons an omen, stranger the deeper you go: Bobber Moon, a Proud Bluegill ("I'm proud of you, son." — then he keeps dropping by as Dad Bluegill with 1950s advice), It's Raining Bait (catch fish with your face), a Land Trout, the Bass God (lightning, ×2 score), The Sky Is a Lake, a giant hook fishing for you, The Tackle Box Opens (snag giant lures), Worm Rapture, and the Bass God's son. Big airs sometimes summon the **Pikeminnow Rocket**, which tows PJ through a hyperspace slipstream far down the trail. Dev: `game.launchRocket()`, `node scripts/rocket.mjs`. Dev: `game.summon("bassSon")`, `node scripts/omens.mjs`, `node scripts/art.mjs`.
 
 ## Scoring
 
-Distance plus air points: trick base (flip 500 / double 1,200 / triple 2,000, grabs 60 per 0.1 s, perfect pop +150) × number of different tricks × Flow (1 + 0.5 per level) × landing (Perfect 1.5, Buttery 1.2). Sketchy landings bank half. Perfect/Buttery landings fill Flow; at 5 you're ON FIRE. Named combos: Bluegill Backflip, Largemouth Tailwhip, The Double Hookset, Lunker Loop, Full Tackle Box, Catch-and-Release.
+Distance plus air points: trick base (flip 500 / double 1,200 / triple 2,000, grabs 60 per 0.1 s, perfect pop +150) × number of different tricks × Flow (1 + 0.5 per level) × landing (Perfect 1.5, Buttery 1.2). Sketchy landings bank half. Landing any trick kicks in +1.5 m/s, and pumping the flats claws back 60 % of rolling losses (a little help, never a free ride). Perfect/Buttery landings fill Flow; at 5 you're ON FIRE. Named combos: Bluegill Backflip, Largemouth Tailwhip, The Double Hookset, Lunker Loop, Full Tackle Box, Catch-and-Release.
 
 `?seed=123` rides a specific trail; the default is today's Daily Line.

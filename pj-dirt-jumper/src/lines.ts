@@ -25,12 +25,15 @@ export type LineKey =
   | "milestone"
   | "dad"
   | "dadHype"
-  | "dadBail";
+  | "dadBail"
+  | "dadSon"
+  | "rocket"
+  | "slipstream";
 export const LINES: Record<LineKey, readonly string[]> = {
   pop: ["Popped!", "Up and out!", "Boost!", "Hop!", "Liftoff!", "Boing!", "Snap!"],
   perfectPop: ["PERFECT POP!", "SNAP!", "Popped like a bobber!", "CRISP POP!", "TEXTBOOK!", "POP GOES THE PJ!", "SPRING-LOADED!"],
   send: ["SEND IT!", "FULL SEND!", "HUCK IT!", "YEET!", "SEND THE BAIT!", "GO GO GO!", "AIRMAIL!", "CLEARED FOR TAKEOFF!", "BYE BYE GRAVITY!", "LAUNCH CODES ACCEPTED!"],
-  small: ["SENDY!", "STEEZY!", "NICE CAST!", "SMOOTH!", "DIALED!", "CLEAN!", "TIDY!", "SMOOTH OPERATOR!", "NIBBLE!", "SWEET!", "CRISP!", "EASY PEASY!"],
+  small: ["SENDY!", "STEEZY!", "NICE CAST!", "SMOOTH!", "DIALED!", "CLEAN!", "TIDY!", "SMOOTH OPERATOR!", "NIBBLE!", "SWEET!", "CRISP!", "EASY PEASY!", "KOKANEE CUTE!", "CRAPPIE-TASTIC!"],
   big: [
     "FULL SENDER!",
     "THAT'S A KEEPER!",
@@ -45,6 +48,9 @@ export const LINES: Record<LineKey, readonly string[]> = {
     "REEL IT IN!",
     "ABSOLUTE UNIT!",
     "YOU LOVE TO SEE IT!",
+    "DELTA DIRT!",
+    "CLEAR LAKE LUNKER!",
+    "STRIPER SEASON!",
   ],
   huge: [
     "ABSOLUTE LUNKER!",
@@ -60,6 +66,9 @@ export const LINES: Record<LineKey, readonly string[]> = {
     "HALL OF FAME!",
     "PHYSICS IS CRYING!",
     "SOMEBODY CLIP THAT!",
+    "STURGEON-SIZED!",
+    "BIGGER THAN A SHASTA STRIPER!",
+    "STEELHEAD STATUS!",
   ],
   perfect: ["BUTTERED!", "BUTTERY SMOOTH!", "GREASED IT!", "SILK!", "PERFECTION!", "NO NOTES!", "CHEF'S KISS!"],
   buttery: ["Buttery.", "Smooth.", "Slick.", "Nice.", "Soft landing."],
@@ -69,7 +78,7 @@ export const LINES: Record<LineKey, readonly string[]> = {
   cased: ["Cased it.", "Snagged the knuckle.", "Came up short, bro.", "Knuckle sandwich.", "Too short, too bad.", "Bottomed out!"],
   huck: ["Huck to flat, bro.", "Flat-landed. Ouch.", "Spine compression unlocked.", "Pancaked!", "Flat as a flounder!", "That'll leave a mark."],
   sideways: ["YARD SALE!", "Landed sideways.", "Line snapped!", "Wrong way up!", "EJECT!", "Upside-down bass!", "Tangled line!"],
-  stalled: ["Skunked.", "Zero bites.", "Ran outta line.", "Dead in the water.", "Out of gas.", "Motor's off.", "Stuck in the weeds."],
+  stalled: ["Skunked.", "Zero bites.", "Ran outta line.", "Dead in the water.", "Out of gas.", "Motor's off.", "Stuck in the weeds.", "Stuck like a catfish in Delta mud."],
   flowUp: ["Flow rising!", "In the zone!", "Feeling it!", "Warming up!", "Locked in!", "Groove found!"],
   onFire: ["ON FIRE!", "BIG FISH ENERGY!", "MAXIMUM SEND!", "UNSTOPPABLE!", "HOT ROD!", "SPICY MODE!", "RED HOT BAIT!"],
   newBest: ["NEW PERSONAL BEST!", "RECORD CATCH!", "NEW PB!", "BEST ONE YET!"],
@@ -92,8 +101,15 @@ export const LINES: Record<LineKey, readonly string[]> = {
     "Somebody please be filming this.",
     "Pump the backs, pop the lips. Easy.",
     "Tire pressure: vibes.",
+    "Clear Lake bass are twice this size. Probably.",
+    "Should've hit the Delta today.",
+    "Striper run's on at the Sac. Dirt's on up here.",
+    "Tahoe's too cold. Dirt's just right.",
+    "Grandpa swears there's a sturgeon in the river older than him.",
+    "Smallmouth on the brain.",
+    "Rainbow trout don't even know how good they have it.",
   ],
-  milestone: ["Deeper water!", "The lake is calling.", "Going deep!", "Further than the bait shop!", "Uncharted dirt!"],
+  milestone: ["Deeper water!", "The lake is calling.", "Going deep!", "Further than the bait shop!", "Uncharted dirt!", "Past the dam!", "Upstream, like a steelhead!"],
   // Dad Bluegill: a 1950s sitcom father who happens to be a fish. Sincere, outdated, a little lost.
   dad: [
     "A firm handshake and a clean bicycle will take you anywhere, son.",
@@ -128,6 +144,14 @@ export const LINES: Record<LineKey, readonly string[]> = {
     "I'm so proud I could spawn.",
     "Somebody fetch the Kodak!",
   ],
+  dadSon: [
+    "Nice boy you've got there, big fella. Good strong fins.",
+    "Son, that's the Bass God's boy. Shake his fin like a gentleman.",
+    "Kevin seems like a fine young bass. Invite him for supper.",
+    "I saw his father once, back in '52. He still owes me four dollars.",
+  ],
+  rocket: ["PIKEMINNOW ROCKET!", "HITCHING A RIDE!", "SACRAMENTO SPACE PROGRAM!", "HOLD ON TO YOUR WORMS!", "NATIVE SPECIES, ROCKET SPEED!", "FISH-POWERED FLIGHT!"],
+  slipstream: ["SLIPSTREAM!", "BACK FROM HYPERSPACE!", "SPLASHDOWN!", "WARP SPEED DELIVERY!", "RIVER-POWERED!", "STICK THE LANDING, SPACE COWBOY!"],
   dadBail: [
     "Walk it off, sport. Rub some mud on it.",
     "That's alright, son. Even Eisenhower fell off his bicycle.",
@@ -142,7 +166,7 @@ export const LINES: Record<LineKey, readonly string[]> = {
 /** Extra lines that join a pool once the run is deep enough: weirder the further you go. */
 const DEEP: Partial<Record<LineKey, readonly (readonly string[])[]>> = {
   chatter: [
-    ["The fish are watching.", "Did that cloud just wink?", "The trees are whispering about bait.", "I can hear the lake breathing."],
+    ["The fish are watching.", "The sturgeon remember the dinosaurs. They remember me too.", "Did that cloud just wink?", "The trees are whispering about bait.", "I can hear the lake breathing."],
     ["I am one with the bass.", "My blood type is lake water.", "The bobber moon knows my name.", "Gravity is just a suggestion now."],
     ["I have seen the Bass God. It saw me back.", "Time is a flat lake.", "What if the dirt is fishing for ME?", "I haven't blinked in 3 kilometres."],
   ],

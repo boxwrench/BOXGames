@@ -7,6 +7,7 @@ export const T = {
   rollingResistance: 0.6,
   drag: 0.004,
   pumpGain: 9,
+  pumpPush: 0.6, // share of rolling losses that pumping cancels, even on the flat: helps, never keeps PJ going alone
   curvatureFactor: 1,
   maxSpeed: 22, // m/s that pumping and landing bonuses can reach (before Flow bonuses)
   hardSpeed: 32, // m/s gravity can carry PJ to on descents
@@ -39,6 +40,7 @@ export const T = {
   upslope: 3 * deg,
   huckImpact: 18,
   landSpeed: { perfect: 3, buttery: 1.5, clean: 0, sketchy: -3 },
+  trickSpeed: 1.5, // m/s kick for landing any trick (on top of the grade's)
   wobbleSeconds: 0.5,
   // Track design
   botPopAt: 0.2, // s before the lip the reference bot lets go (a good, not perfect, pop)
@@ -65,4 +67,11 @@ export const T = {
   depthMultMax: 2,
   catchPoints: 250, // per fish caught during fish rain
   dadPoints: 300, // each time Dad Bluegill drops back in with advice
+  // Pikeminnow Rocket: big airs sometimes get towed through the slipstream
+  rocketAir: 1.5, // s of predicted air before the rocket might show
+  rocketChance: 0.35,
+  rocketCooldown: 40, // s between rides
+  rocketMeters: 160, // at least this far down the trail
+  rocketDropPast: 2, // m past the landing's sweet spot where PJ touches down
+  rocketPoints: 2500,
 } as const;

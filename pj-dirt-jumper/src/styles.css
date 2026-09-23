@@ -73,7 +73,7 @@
 @media (orientation:landscape) and (max-height:500px){.flow{top:auto;bottom:calc(max(20px,env(safe-area-inset-bottom)) + 84px)}.end h1{font-size:44px}.results{padding:8px 14px}.results dd{font-size:18px}}
 @media (orientation:portrait){.feed{top:17%;font-size:15px}}
 /* ——— Over-the-top feedback ——— */
-.flash{position:absolute;inset:0;opacity:0;pointer-events:none;mix-blend-mode:screen}.flash.go{animation:flash .28s ease-out}
+.flash{position:absolute;inset:0;opacity:0;pointer-events:none}.flash.go{animation:flash .28s ease-out}
 @keyframes flash{from{opacity:.85}to{opacity:0}}
 .edge{position:absolute;inset:0;opacity:0;pointer-events:none;box-shadow:inset 0 0 120px 30px var(--c,#c6ff3d)}.edge.go{animation:edge .9s ease-out}
 @keyframes edge{0%{opacity:0}15%{opacity:1}100%{opacity:0}}
@@ -151,3 +151,4 @@
 .ticker i{font-style:normal}.ticker.show{animation:ticker 3.8s ease-out forwards}
 @keyframes ticker{0%{opacity:0;transform:translateY(12px) scale(.9)}8%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0;transform:translateY(-8px)}}
 @media (pointer:coarse){.ticker{bottom:auto;top:22%}}
+.warp{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0}

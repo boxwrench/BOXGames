@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-export type Cue = "pop" | "perfectPop" | "land" | "perfect" | "sketchy" | "trick" | "reel" | "bail" | "flowUp" | "onFire" | "stall" | "best" | "airhorn" | "cheer" | "whoosh" | "slam" | "thunder" | "choir" | "splash" | "bubbles" | "depth";
+export type Cue = "pop" | "perfectPop" | "land" | "perfect" | "sketchy" | "trick" | "reel" | "bail" | "flowUp" | "onFire" | "stall" | "best" | "airhorn" | "cheer" | "whoosh" | "slam" | "thunder" | "choir" | "splash" | "bubbles" | "depth" | "rocket" | "warp";
 interface Voice {
   type?: OscillatorType;
   f0: number;
@@ -250,6 +250,18 @@ export class Sound {
         break;
       case "depth":
         [196, 247, 294, 392].forEach((f, i) => this.voice({ type: "sawtooth", f0: f, dur: 0.3, vol: 0.08, at: t + i * 0.07, filter: { type: "lowpass", f0: 2400 } }));
+        break;
+      case "rocket":
+        // Ignition crackle, then a roaring burn.
+        this.hiss({ dur: 0.3, vol: 0.7, filter: { type: "highpass", f0: 1200 } });
+        this.hiss({ at: t + 0.1, dur: 1.4, vol: 0.55, attack: 0.15, rate: 0.6, filter: { type: "lowpass", f0: 300, f1: 1800 } });
+        this.voice({ type: "sawtooth", f0: 60, f1: 140, dur: 1.4, vol: 0.2, at: t + 0.1, filter: { type: "lowpass", f0: 400 } });
+        break;
+      case "warp":
+        // Hyperspace: a sweeping whoom and a long shimmering tail.
+        this.voice({ type: "sawtooth", f0: 80, f1: 1600, dur: 0.9, vol: 0.12, filter: { type: "lowpass", f0: 300, f1: 6000 } });
+        this.hiss({ dur: 3.2, vol: 0.35, attack: 0.4, filter: { type: "bandpass", f0: 600, f1: 3000, q: 0.8 } });
+        for (const f of [880, 1320, 1760]) this.voice({ type: "triangle", f0: f, f1: f * 1.5, dur: 2.6, vol: 0.03, at: t + 0.3, attack: 0.4 });
         break;
       case "best":
         [523, 659, 784, 1046, 1318].forEach((f, i) => this.voice({ type: "square", f0: f, dur: 0.16, vol: 0.08, at: t + i * 0.08 }));

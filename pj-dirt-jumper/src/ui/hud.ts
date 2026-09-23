@@ -1,6 +1,7 @@
 import type { Rider } from "../sim/rider";
 import type { AirScore } from "../score/score";
 import { GRAB_NAMES, flipName } from "../score/score";
+import { Warp } from "./warp";
 const $ = (root: HTMLElement, sel: string) => root.querySelector<HTMLElement>(sel)!;
 const GRAB_ICONS = ["🐟", "🎣", "🐠"];
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -29,6 +30,8 @@ export class Hud {
   private feedText = "";
   private calloutTimer = 0;
   private bannerTimer = 0;
+  /** Pikeminnow Rocket hyperspace streaks. */
+  readonly warp = new Warp();
   constructor(parent: HTMLElement) {
     this.el.className = "hud";
     this.el.innerHTML = `
@@ -80,6 +83,7 @@ export class Hud {
         <button data-again>SEND IT AGAIN ↻</button>
         <button class="menu" data-menu>MENU</button>
       </div>`;
+    this.el.prepend(this.warp.el);
     parent.append(this.el);
     this.pad = $(this.el, "[data-pad]");
     this.grabButtons = [...this.el.querySelectorAll<HTMLElement>("[data-grab]")];

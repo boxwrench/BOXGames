@@ -457,3 +457,179 @@ export function paintLakeSky() {
   }
   return c;
 }
+export type LureKind = "crankbait" | "spoon" | "spinnerbait" | "worm" | "popper";
+export const LURES: readonly LureKind[] = ["crankbait", "spoon", "spinnerbait", "worm", "popper"];
+/** A treble hook hanging from (x, y), for the lures. */
+function treble(g: CanvasRenderingContext2D, x: number, y: number, s: number) {
+  g.strokeStyle = "#c8ced6";
+  g.lineWidth = s * 0.08;
+  g.lineCap = "round";
+  g.beginPath();
+  g.moveTo(x, y);
+  g.lineTo(x, y + s * 0.6);
+  g.stroke();
+  for (const dir of [-1, 1, 0]) {
+    g.beginPath();
+    g.moveTo(x, y + s * 0.6);
+    g.quadraticCurveTo(x + dir * s * 0.45, y + s * 1.05, x + dir * s * 0.4 + (dir ? 0 : s * 0.3), y + s * 0.55);
+    g.stroke();
+  }
+}
+/** Giant fishing lures for The Tackle Box Opens (256×128, facing right). */
+export function paintLure(kind: LureKind) {
+  const [c, g] = canvas(256, 128);
+  const shine = (x: number, y: number, rx: number, ry: number) => {
+    g.fillStyle = "rgba(255,255,255,.45)";
+    g.beginPath();
+    g.ellipse(x, y, rx, ry, -0.1, 0, TAU);
+    g.fill();
+  };
+  if (kind === "crankbait") {
+    // Firetiger crankbait: chartreuse back, orange belly, black bars, clear diving lip.
+    const body = g.createLinearGradient(0, 30, 0, 90);
+    body.addColorStop(0, "#9be22a");
+    body.addColorStop(0.55, "#e8f04a");
+    body.addColorStop(1, "#ff7a1a");
+    g.fillStyle = body;
+    g.beginPath();
+    g.ellipse(120, 58, 78, 30, 0, 0, TAU);
+    g.fill();
+    g.fillStyle = "rgba(20,30,10,.7)";
+    for (let i = 0; i < 5; i++) g.fillRect(76 + i * 20, 30, 7, 26);
+    g.fillStyle = "rgba(200,240,255,.55)";
+    g.beginPath();
+    g.moveTo(192, 62);
+    g.lineTo(240, 86);
+    g.lineTo(226, 96);
+    g.lineTo(186, 74);
+    g.fill();
+    g.fillStyle = "#fff";
+    g.beginPath();
+    g.arc(172, 50, 9, 0, TAU);
+    g.fill();
+    g.fillStyle = "#111";
+    g.beginPath();
+    g.arc(174, 50, 5, 0, TAU);
+    g.fill();
+    shine(118, 42, 40, 7);
+    treble(g, 100, 86, 26);
+    treble(g, 52, 70, 22);
+  } else if (kind === "spoon") {
+    // Red-and-silver casting spoon.
+    const metal = g.createLinearGradient(40, 30, 220, 100);
+    metal.addColorStop(0, "#f4f7fa");
+    metal.addColorStop(0.5, "#9aa6b2");
+    metal.addColorStop(1, "#e8edf2");
+    g.fillStyle = metal;
+    g.beginPath();
+    g.ellipse(128, 62, 90, 32, -0.08, 0, TAU);
+    g.fill();
+    g.fillStyle = "#d7262e";
+    g.beginPath();
+    g.ellipse(128, 62, 60, 14, -0.08, 0, TAU);
+    g.fill();
+    shine(140, 44, 46, 6);
+    treble(g, 42, 70, 24);
+  } else if (kind === "spinnerbait") {
+    // Wire arm with two willow blades above a skirted jig head.
+    g.strokeStyle = "#c8ced6";
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(170, 76);
+    g.lineTo(110, 22);
+    g.lineTo(60, 30);
+    g.stroke();
+    for (const [x, y, s] of [
+      [60, 30, 1],
+      [92, 22, 0.8],
+    ] as const) {
+      const gold = g.createLinearGradient(x - 26 * s, y, x + 26 * s, y);
+      gold.addColorStop(0, "#fff3b0");
+      gold.addColorStop(1, "#c89b2a");
+      g.fillStyle = gold;
+      g.beginPath();
+      g.ellipse(x, y, 26 * s, 10 * s, -0.2, 0, TAU);
+      g.fill();
+    }
+    g.fillStyle = "#2e3b2c";
+    g.beginPath();
+    g.arc(176, 78, 14, 0, TAU);
+    g.fill();
+    for (let i = 0; i < 28; i++) {
+      g.strokeStyle = i % 3 ? "#ffffff" : "#ff5a9a";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(166, 78);
+      g.quadraticCurveTo(130, 70 + i * 0.8, 88 + (i % 7) * 4, 64 + i * 1.6);
+      g.stroke();
+    }
+    g.fillStyle = "#fff";
+    g.beginPath();
+    g.arc(182, 74, 4, 0, TAU);
+    g.fill();
+  } else if (kind === "worm") {
+    // Purple curly-tail plastic worm, Texas-rigged on a bright hook.
+    g.strokeStyle = "#6a2bb8";
+    g.lineWidth = 18;
+    g.lineCap = "round";
+    g.beginPath();
+    g.moveTo(220, 60);
+    g.bezierCurveTo(170, 40, 130, 80, 80, 60);
+    g.stroke();
+    g.lineWidth = 10;
+    g.beginPath();
+    g.moveTo(80, 60);
+    g.bezierCurveTo(40, 45, 20, 90, 50, 98);
+    g.bezierCurveTo(70, 104, 64, 80, 52, 82);
+    g.stroke();
+    g.strokeStyle = "rgba(255,255,255,.35)";
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(210, 54);
+    g.bezierCurveTo(170, 36, 132, 74, 90, 55);
+    g.stroke();
+    g.strokeStyle = "#c8ced6";
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(232, 58);
+    g.lineTo(200, 58);
+    g.quadraticCurveTo(160, 100, 150, 60);
+    g.stroke();
+  } else {
+    // Topwater popper: cupped mouth, white belly, frog-green back.
+    const body = g.createLinearGradient(0, 30, 0, 90);
+    body.addColorStop(0, "#3f8a3a");
+    body.addColorStop(0.5, "#a8d86a");
+    body.addColorStop(1, "#fffbe8");
+    g.fillStyle = body;
+    g.beginPath();
+    g.moveTo(200, 30);
+    g.quadraticCurveTo(80, 28, 50, 60);
+    g.quadraticCurveTo(80, 92, 200, 90);
+    g.closePath();
+    g.fill();
+    g.fillStyle = "#1a2a18";
+    g.beginPath();
+    g.ellipse(200, 60, 10, 30, 0, 0, TAU);
+    g.fill();
+    g.fillStyle = "#ffd23a";
+    g.beginPath();
+    g.arc(176, 48, 9, 0, TAU);
+    g.fill();
+    g.fillStyle = "#111";
+    g.beginPath();
+    g.arc(178, 48, 4, 0, TAU);
+    g.fill();
+    for (let i = 0; i < 16; i++) {
+      g.strokeStyle = i % 2 ? "#ffffff" : "#ff3b2f";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(52, 60);
+      g.lineTo(18 + (i % 4) * 3, 40 + i * 2.6);
+      g.stroke();
+    }
+    shine(140, 40, 40, 6);
+    treble(g, 150, 88, 22);
+  }
+  return c;
+}

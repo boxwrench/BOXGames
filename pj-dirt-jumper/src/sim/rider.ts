@@ -122,7 +122,9 @@ function ride(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   r.v += (-T.gravity * sin - T.rollingResistance - T.drag * r.v * r.v) * dt;
   // On a lip face, holding pump only loads the pop; while wobbling, PJ can't pump. Pumping can't push past maxSpeed,
   // but gravity can carry PJ faster (up to hardSpeed), so descents and climbs trade speed without losing it.
-  if (a.pump && toLip > T.lipFace && !r.wobble) r.v = boost(r.v, T.pumpGain * -sin * T.curvatureFactor * dt, speedCap(r));
+  // Pumping the flats also claws back a share of the rolling losses: a little help, never a free ride.
+  if (a.pump && toLip > T.lipFace && !r.wobble)
+    r.v = boost(r.v, (T.pumpGain * -sin * T.curvatureFactor + T.pumpPush * (T.rollingResistance + T.drag * r.v * r.v)) * dt, speedCap(r));
   r.v = clamp(r.v, 0, T.hardSpeed);
   const nx = r.x + r.v * cos * dt;
   r.distance += r.v * dt;
@@ -256,7 +258,8 @@ function fly(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
     if (seconds >= T.grabMin) tricks.push({ kind: "grab", grab, seconds, releasedAt: r.grabRelease[grab] });
   });
   Object.assign(r, {
-    v: clamp(boost(Math.max(0, along), T.landSpeed[grade], speedCap(r)), 0, T.hardSpeed),
+    // Landing any trick kicks a little extra speed in: stunts get you speed.
+    v: clamp(boost(Math.max(0, along), T.landSpeed[grade] + (tricks.length ? T.trickSpeed : 0), speedCap(r)), 0, T.hardSpeed),
     wobble: grade === "sketchy" ? T.wobbleSeconds : 0,
     pitch: angle,
     omega: 0,

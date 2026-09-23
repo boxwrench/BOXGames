@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { OmenKind } from "./director";
-import { paintBassGod, paintBluegill, paintFish, paintLakeSky } from "./art";
+import { LURES, paintBassGod, paintBluegill, paintFish, paintLakeSky, paintLure } from "./art";
 import bluegillPhoto from "../assets/bluegill.webp";
 import bassGodPhoto from "../assets/bassgod.webp";
 import landTroutPhoto from "../assets/landtrout.webp";
@@ -46,6 +46,28 @@ export class Omens {
   /** The user's crowned, haloed Bass God; the painted one stands in until (or if) it fails to load. */
   private god = { tex: texture(paintBassGod()) as THREE.Texture, aspect: 1 };
   private lakeTex = texture(paintLakeSky());
+  private lureTex = LURES.map((k) => texture(paintLure(k)));
+  /** A soft shaft of heavenly light: bright core, feathered edges, fading out at the ground. */
+  private shaft = (() => {
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 256;
+    const g = c.getContext("2d")!,
+      across = g.createLinearGradient(0, 0, 64, 0);
+    across.addColorStop(0, "rgba(255,255,255,0)");
+    across.addColorStop(0.5, "rgba(255,255,255,1)");
+    across.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = across;
+    g.fillRect(0, 0, 64, 256);
+    g.globalCompositeOperation = "destination-in";
+    const down = g.createLinearGradient(0, 0, 0, 256);
+    down.addColorStop(0, "rgba(0,0,0,.6)");
+    down.addColorStop(0.85, "rgba(0,0,0,1)");
+    down.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = down;
+    g.fillRect(0, 0, 64, 256);
+    return texture(c);
+  })();
   private soft = softTexture();
   constructor(private stage: Stage) {
     const photo = new Image();
@@ -68,6 +90,9 @@ export class Omens {
       bassGod: () => this.bassGod(dur),
       lakeSky: () => this.lakeSky(dur),
       giantHook: () => this.giantHook(dur),
+      tackleBox: () => this.tackleBox(dur),
+      wormRapture: () => this.wormRapture(dur),
+      bassSon: () => this.bassGod(dur, true),
     };
     this.running.push(make[kind]());
   }
@@ -215,7 +240,7 @@ export class Omens {
     );
   }
   /** Lightning strikes and the sun becomes the crowned, burning Bass God. */
-  private bassGod(dur: number) {
+  private bassGod(dur: number, son = false) {
     const { tex, aspect } = this.god,
       // Untouched by fog and tone mapping so the gold stays gold; high above the ridges so no pine blocks the view.
       god = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, fog: false, depthWrite: false, depthTest: false, toneMapped: false })),
@@ -227,6 +252,11 @@ export class Omens {
     god.scale.set(0.01, 0.01, 1);
     aura.scale.set(0.01, 0.01, 1);
     this.stage.backdrop.sunGroup.add(aura, god);
+    // The second coming: a small son (also a bass), looking up at his father, bobbing with excitement.
+    const kid = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, fog: false, depthWrite: false, depthTest: false, toneMapped: false }));
+    kid.renderOrder = 6;
+    kid.visible = son;
+    this.stage.backdrop.sunGroup.add(kid);
     const strike = () => {
       const sun = this.stage.backdrop.sunGroup.getWorldPosition(new THREE.Vector3()),
         p = this.stage.screen(sun.x, sun.y, sun.z);
@@ -237,22 +267,30 @@ export class Omens {
     strike();
     setTimeout(strike, 180);
     this.stage.sound.play("choir");
-    this.stage.sound.speak("Behold. The bass god is pleased.", 0.1, 0.7);
+    if (son) {
+      this.stage.sound.speak("This is my son. He is also a bass.", 0.1, 0.7);
+      setTimeout(() => this.stage.sound.speak("Hi. I'm Kevin.", 2, 1.2), 3200);
+    } else this.stage.sound.speak("Behold. The bass god is pleased.", 0.1, 0.7);
     return this.run(
-      "bassGod",
+      son ? "bassSon" : "bassGod",
       dur,
       () => {
-        const r = this.running.find((x) => x.kind === "bassGod")!,
+        const r = this.running.find((x) => x.kind === (son ? "bassSon" : "bassGod"))!,
           grow = Math.min(1, r.t / 0.6) * Math.min(1, (dur - r.t) / 0.8),
           pulse = 1 + Math.sin(r.t * 5) * 0.03;
         const w = 230 * grow * pulse;
         god.scale.set(w, w * aspect, 1);
         aura.scale.set(w * 1.5, w * 1.5, 1);
         god.material.rotation = Math.sin(r.t * 0.8) * 0.05;
+        const kw = -115 * Math.min(1, Math.max(0, (r.t - 1.2) / 0.5)) * Math.min(1, (dur - r.t) / 0.8);
+        kid.scale.set(kw, -kw * aspect, 1);
+        kid.position.set(-175, -15 + Math.abs(Math.sin(r.t * 4)) * 14, 1);
+        kid.material.rotation = Math.sin(r.t * 4) * 0.12;
         return 0;
       },
       () => {
-        this.stage.backdrop.sunGroup.remove(god, aura);
+        this.stage.backdrop.sunGroup.remove(god, aura, kid);
+        kid.material.dispose();
         god.material.dispose();
         aura.material.dispose();
       },
@@ -351,6 +389,126 @@ export class Omens {
         return 0;
       },
       () => this.root.remove(g),
+    );
+  }
+  /** Giant lures drift across the sky; low ones cross PJ's path and can be snagged for points. */
+  private tackleBox(dur: number) {
+    this.stage.sound.speak("The tackle box is open. The lures are free.", 0.8, 0.9);
+    this.stage.sound.play("reel");
+    const lures: { s: THREE.Sprite; v: THREE.Vector2; spin: number; low: boolean; live: boolean }[] = [];
+    let clock = 0;
+    return this.run(
+      "tackleBox",
+      dur,
+      (dt, pj) => {
+        const r = this.running.find((x) => x.kind === "tackleBox")!;
+        clock += dt;
+        while (r.t < dur - 2 && clock > 0.35) {
+          clock -= 0.35;
+          const low = Math.random() < 0.45,
+            s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.lureTex[Math.floor(Math.random() * this.lureTex.length)], transparent: true, fog: !low }));
+          if (low) {
+            // Crosses PJ's line a little ahead, at grab height.
+            s.scale.set(3.2, 1.6, 1);
+            s.position.set(pj.x + 26 + Math.random() * 16, pj.y + 1 + Math.random() * 4, 0.5);
+          } else {
+            const size = 30 + Math.random() * 35;
+            s.scale.set(size, size / 2, 1);
+            s.position.set(this.stage.camera.position.x + 120 + Math.random() * 60, pj.y + 20 + Math.random() * 60, -140 - Math.random() * 120);
+          }
+          this.root.add(s);
+          lures.push({ s, v: new THREE.Vector2(low ? -2 : -14 - Math.random() * 10, low ? 0 : (Math.random() - 0.5) * 3), spin: (Math.random() - 0.5) * 1.5, low, live: true });
+        }
+        let caught = 0;
+        for (const l of lures) {
+          l.s.position.x += l.v.x * dt;
+          l.s.position.y += l.v.y * dt + Math.sin(r.t * 2 + l.s.position.x) * 0.02;
+          l.s.material.rotation = Math.sin(r.t * l.spin * 2) * 0.35;
+          if (l.low && l.live && l.s.position.distanceTo(new THREE.Vector3(pj.x, pj.y + 1, 0.5)) < 2) {
+            l.live = false;
+            caught++;
+            this.stage.fx.sparks(l.s.position, 14, "#ffe98a", 0.6);
+            this.stage.sound.play("reel");
+          }
+          if (!l.live || l.s.position.x < this.stage.camera.position.x - 150) {
+            l.live = false;
+            this.root.remove(l.s);
+          }
+        }
+        for (let i = lures.length - 1; i >= 0; i--) if (!lures[i].live) lures.splice(i, 1);
+        return caught;
+      },
+      () => {
+        for (const l of lures) this.root.remove(l.s);
+      },
+    );
+  }
+  /** The ground wriggles: worms burst out along the trail, then float up into golden beams. */
+  private wormRapture(dur: number) {
+    this.stage.sound.speak("The worms are ascending. Do not follow them.", 0.5, 0.8);
+    this.stage.sound.play("thunder");
+    const SEG = 9,
+      COUNT = 40,
+      worms = new THREE.InstancedMesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshStandardMaterial({ color: "#e0788e", roughness: 0.55 }), COUNT * SEG),
+      beams: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [],
+      m = new THREE.Matrix4(),
+      spots: { x: number; z: number; phase: number; up: number; delay: number }[] = [];
+    worms.frustumCulled = false;
+    for (let i = 0; i < 3; i++) {
+      const beam = new THREE.Mesh(
+        new THREE.PlaneGeometry(7, 130),
+        new THREE.MeshBasicMaterial({ map: this.shaft, color: "#ffe7a0", transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
+      );
+      beams.push(beam);
+    }
+    this.root.add(worms, ...beams);
+    let origin = NaN;
+    return this.run(
+      "wormRapture",
+      dur,
+      (dt, pj, groundAt) => {
+        const r = this.running.find((x) => x.kind === "wormRapture")!;
+        if (Number.isNaN(origin)) {
+          origin = pj.x;
+          for (let i = 0; i < COUNT; i++) spots.push({ x: pj.x + 8 + i * 3.2 + Math.random() * 2, z: -1.5 - Math.random() * 7, phase: Math.random() * 6, up: 0, delay: i * 0.05 });
+        }
+        // Keep the congregation just ahead of PJ: worms left behind re-emerge further on.
+        for (const s of spots)
+          if (s.x < pj.x - 12) {
+            s.x += COUNT * 3.2;
+            s.up = 0;
+            s.delay = r.t;
+          }
+        const ascend = r.t > 4 ? (r.t - 4) * 1.6 : 0;
+        spots.forEach((s, i) => {
+          const out = Math.min(1, Math.max(0, (r.t - s.delay) * 2)),
+            lift = ascend * (1 + (i % 5) * 0.2),
+            base = groundAt(s.x) - 0.6 + out * 0.6 + lift;
+          for (let j = 0; j < SEG; j++) {
+            const k = j / (SEG - 1),
+              wig = Math.sin(r.t * 8 + s.phase + j * 0.8) * 0.3 * k;
+            m.makeTranslation(s.x + wig, base + j * 0.26 * out, s.z + Math.cos(r.t * 6 + j) * 0.1);
+            worms.setMatrixAt(i * SEG + j, m);
+          }
+        });
+        worms.instanceMatrix.needsUpdate = true;
+        beams.forEach((b, i) => {
+          b.position.set(pj.x + 12 + i * 20, pj.y + 60, -6 - i * 2);
+          b.rotation.z = 0.12 + Math.sin(r.t * 0.7 + i) * 0.03;
+          b.material.opacity = Math.min(0.7, Math.max(0, (r.t - 3.2) * 0.5)) * Math.min(1, (dur - r.t) / 1.5);
+        });
+        // The ground itself wriggles.
+        if (r.t < 4) {
+          this.stage.camera.position.y += Math.sin(r.t * 40) * 0.06;
+          if (Math.random() < 0.3) this.stage.fx.dust(new THREE.Vector3(pj.x + 6 + Math.random() * 30, groundAt(pj.x + 20), -3), 1, { size: 1.6, spread: 2, rise: 1, life: 1, color: "#9a6a40" });
+        }
+        if (r.t > 4 && r.t - dt <= 4) this.stage.sound.play("choir");
+        return 0;
+      },
+      () => {
+        this.root.remove(worms, ...beams);
+        worms.dispose();
+      },
     );
   }
 }

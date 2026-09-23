@@ -1,6 +1,6 @@
 import { mulberry32 } from "../rng";
 import { T } from "../tuning";
-export type OmenKind = "bobberMoon" | "proudBluegill" | "fishRain" | "landTrout" | "bassGod" | "lakeSky" | "giantHook";
+export type OmenKind = "bobberMoon" | "proudBluegill" | "fishRain" | "landTrout" | "bassGod" | "lakeSky" | "giantHook" | "tackleBox" | "wormRapture" | "bassSon";
 export interface OmenSpec {
   kind: OmenKind;
   /** Seconds the omen (and its buff) lasts. */
@@ -21,6 +21,9 @@ export const OMENS: readonly OmenSpec[] = [
   { kind: "bassGod", duration: 20, mult: 2, bonus: 5000, title: "THE BASS GOD IS PLEASED", line: "DIVINE BITE — ×2 SCORE" },
   { kind: "lakeSky", duration: 16, mult: 1.5, bonus: 0, title: "THE SKY IS A LAKE", line: "Breathe normally. Probably. ×1.5" },
   { kind: "giantHook", duration: 10, mult: 2, bonus: 3000, title: "DON'T TAKE THE BAIT", line: "Something up there is fishing for YOU. ×2" },
+  { kind: "tackleBox", duration: 14, mult: 1.5, bonus: 0, title: "THE TACKLE BOX OPENS", line: "The lures are migrating. Snag one! ×1.5" },
+  { kind: "wormRapture", duration: 14, mult: 1.5, bonus: 2500, title: "WORM RAPTURE", line: "The ground is wriggling. The worms are ascending. ×1.5" },
+  { kind: "bassSon", duration: 20, mult: 2.5, bonus: 6000, title: "THE BASS GOD HAS A SON", line: "HOLY FAMILY — ×2.5 SCORE" },
 ];
 const SCHEDULE = [300, 600, 1000, 1500, 2000, 2600, 3300, 4000];
 /** Distance of milestone i (0-based): the schedule, then every 800 m. */

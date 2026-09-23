@@ -19,6 +19,8 @@ import { Sound } from "./audio/sound";
 import { storage } from "./storage";
 import { Director, OMENS, type OmenKind } from "./weird/director";
 import { Omens } from "./weird/omens";
+import { PikeminnowRocket } from "./weird/rocket";
+import { dropPoint, dropRider } from "./sim/slipstream";
 import { T } from "./tuning";
 const TIPS: Record<BailReason | "stalled", string> = {
   stalled: "Pump the downslopes to keep your speed.",
@@ -46,6 +48,10 @@ export class Game {
   score = new Score();
   director = new Director(0);
   readonly omens: Omens;
+  readonly rocket: PikeminnowRocket;
+  /** When the rocket last came, and where the tow started (distance keeps counting through the slipstream). */
+  private rocketAt = -99;
+  private towFrom = { x: 0, distance: 0 };
   private omensSeen = 0;
   /** `?autopilot` lets the reference bot ride; `?autopilot=tricks` adds grabs (demo, smoke tests). */
   autopilot: false | "bot" | "tricks";
@@ -101,7 +107,8 @@ export class Game {
       backdrop: this.backdrop,
       screen: (x, y, z = 0) => this.screen(x, y, z),
     });
-    this.stage.scene.add(this.backdrop.root, this.trackView.root, this.riderView.root, this.fx.root, this.trail.mesh, this.omens.root);
+    this.rocket = new PikeminnowRocket(this.fx);
+    this.stage.scene.add(this.backdrop.root, this.trackView.root, this.riderView.root, this.fx.root, this.trail.mesh, this.omens.root, this.rocket.root);
     this.hud.onRestart = () => this.reset();
     this.hud.onMute = () => {
       this.sound.toggle();
@@ -136,6 +143,8 @@ export class Game {
     this.director = new Director(seed);
     this.omensSeen = 0;
     this.omens.clear();
+    this.rocket.stop();
+    this.rocketAt = -99;
     this.prev = { x: this.rider.x, y: this.rider.y, pitch: this.rider.pitch };
     this.acc = 0;
     this.tier = "";
@@ -293,17 +302,72 @@ export class Game {
     this.hud.ticker(this.lines.pick("chatter", this.depth));
   }
   /** Dad Bluegill pipes up (not too often); true if he did. */
-  private dad(key: "dad" | "dadHype" | "dadBail") {
+  private dad(key: "dad" | "dadHype" | "dadBail" | "dadSon") {
     if (this.clock - this.dadAt < 12) return false;
     this.dadAt = this.clock;
     this.dadIn = 35 + Math.random() * 25;
     this.omens.dad(this.lines.pick(key, this.depth));
     return true;
   }
+  /** The Pikeminnow Rocket swoops in and hooks PJ at the top of a big air (also a test hook: `game.launchRocket()`). */
+  launchRocket() {
+    const r = this.rider;
+    if (this.rocket.active || (r.state !== "air" && r.state !== "riding")) return;
+    this.rocketAt = this.clock;
+    this.towFrom = { x: r.x, distance: r.distance };
+    this.gen.ensure(r.x + T.rocketMeters + 300);
+    const drop = dropPoint(this.gen.track, r.x, T.rocketMeters);
+    this.gen.ensure(drop + 260);
+    this.rocket.start(r.x, r.state === "air" ? r.y : r.y + 1.5, drop);
+    Object.assign(r, { state: "air", omega: 0, pump: false, preload: 0, grab: 0, grabBlend: 1, vy: 0 });
+    this.slowmo = 0;
+    this.hud.hang(null);
+    this.hud.callout(this.lines.pick("rocket", this.depth), "Pikeminnow Rocket", "huge");
+    this.sound.play("rocket");
+    this.sound.play("whoosh");
+    this.sound.speak("Pikeminnow rocket! Hold on!", 1.2, 1.15);
+  }
+  /** PJ is being towed: the rocket owns PJ's position until touchdown, then the sim takes over again. */
+  private tow(r: Rider, dt: number, track: Track) {
+    const pose = this.rocket.update(
+      dt,
+      (x) => track.heightAt(x),
+      (x) => track.angleAt(x),
+    );
+    if (pose) {
+      if (pose.phase === "warp" && this.towWarp === 0) {
+        this.sound.play("warp");
+        this.hud.flash("#dff6ff");
+        this.cam.punch(14, 0.5);
+      }
+      this.towWarp = pose.warp;
+      Object.assign(r, { x: pose.x, y: pose.y, pitch: pose.pitch, vx: Math.min(pose.speed, 60), vy: 0, distance: this.towFrom.distance + (pose.x - this.towFrom.x) });
+      if (pose.phase === "drop") Object.assign(r, { grab: -1, grabBlend: Math.max(0, r.grabBlend - dt * 4) });
+      this.prev = { x: r.x, y: r.y, pitch: r.pitch };
+      return;
+    }
+    // Touchdown: back on the dirt, flat out, with a hero landing.
+    this.towWarp = 0;
+    dropRider(r, track, this.rocket.landing);
+    this.prev = { x: r.x, y: r.y, pitch: r.pitch };
+    const points = Math.round(T.rocketPoints * this.director.mult),
+      at = V.set(r.x, r.y, 0);
+    this.score.award(points);
+    this.hud.callout(this.lines.pick("slipstream", this.depth), "Rocket ride", "huge", `+${points.toLocaleString("en-US")}`);
+    this.fx.ring(at, 4, "#8ff7ff", 0.5);
+    this.fx.dust(at, 26, { size: 2.4, spread: 3, rise: 1.4, life: 1.4 });
+    this.fx.sparks(at.clone().setY(r.y + 1), 40, "#bff6ff");
+    this.cam.punch(8, 0.6);
+    this.hud.flash("#e4fbff");
+    this.hud.pulse("#8ff7ff");
+    this.sound.play("slam");
+    this.sound.play("cheer");
+  }
+  private towWarp = 0;
   /** Test hook: summon an omen now (art review, smoke tests). */
   summon(kind: OmenKind) {
     const o = OMENS.find((x) => x.kind === kind)!;
-    this.hud.omen(o.title, kind === "proudBluegill" ? "" : o.line, kind === "bassGod");
+    this.hud.omen(o.title, kind === "proudBluegill" ? "" : o.line, kind === "bassGod" || kind === "bassSon");
     this.startOmen(kind, o.duration);
   }
   /** Test hook: wipe out right now (smoke tests use it to capture the yard sale). */
@@ -402,7 +466,17 @@ export class Game {
       this.dadMet = true;
       this.dadAt = this.clock;
       this.dadIn = 30 + Math.random() * 20;
-    } else this.omens.start(kind, duration);
+    } else {
+      this.omens.start(kind, duration);
+      // Dad Bluegill has opinions about the Bass God's boy.
+      const run = this.director;
+      if (kind === "bassSon" && this.dadMet)
+        setTimeout(() => {
+          if (this.director !== run || this.ended) return;
+          this.dadAt = -99;
+          this.dad("dadSon");
+        }, 6500);
+    }
   }
   /** Depth milestones summon omens; their buffs and depth scale the score; fish rain pays per catch. */
   private deepWater(r: Rider, dt: number, x: number, y: number) {
@@ -412,7 +486,7 @@ export class Game {
         this.omensSeen++;
         this.score.award(m.bonus);
         this.hud.milestone(m.distance, m.bonus, this.director.depthMult);
-        this.hud.omen(m.omen.title, m.omen.kind === "proudBluegill" ? "" : m.omen.line, m.omen.kind === "bassGod");
+        this.hud.omen(m.omen.title, m.omen.kind === "proudBluegill" ? "" : m.omen.line, m.omen.kind === "bassGod" || m.omen.kind === "bassSon");
         this.hud.pulse("#8ff7ff");
         this.hud.ticker(this.lines.pick("milestone", this.depth));
         this.sound.play("depth");
@@ -421,14 +495,23 @@ export class Game {
     }
     this.director.tick(dt);
     this.score.bonus = this.director.mult;
-    const buff = (["bassGod", "giantHook", "landTrout", "lakeSky"] as const).find((k) => this.director.active(k) > 0),
-      spec = buff && { bassGod: "DIVINE BITE ×2", giantHook: "BAITED ×2", landTrout: "LAND TROUT ×1.5", lakeSky: "LAKE MODE ×1.5" }[buff];
+    const BADGES = {
+        bassSon: "HOLY FAMILY ×2.5",
+        bassGod: "DIVINE BITE ×2",
+        giantHook: "BAITED ×2",
+        landTrout: "LAND TROUT ×1.5",
+        lakeSky: "LAKE MODE ×1.5",
+        tackleBox: "TACKLE BOX ×1.5",
+        wormRapture: "RAPTURE ×1.5",
+      } as const,
+      buff = (Object.keys(BADGES) as (keyof typeof BADGES)[]).find((k) => this.director.active(k) > 0),
+      spec = buff && BADGES[buff];
     this.hud.badges(this.director.depthMult, spec ? `${spec} · ${Math.ceil(this.director.active(buff!))}s` : "");
     const caught = this.omens.update(dt, V.set(x, y, 0), (gx) => this.gen.track.heightAt(gx));
     if (caught) {
       this.score.award(caught * T.catchPoints);
       const sp = this.screen(x, y + 2);
-      this.hud.floater(`CAUGHT ONE! +${caught * T.catchPoints}`, sp.x, sp.y, false);
+      this.hud.floater(`${this.director.active("tackleBox") ? "SNAGGED A LURE!" : "CAUGHT ONE!"} +${caught * T.catchPoints}`, sp.x, sp.y, false);
     }
   }
   /** Big airs get a beat of slow motion at the top of the arc. */
@@ -437,7 +520,9 @@ export class Game {
     this.apexDone = true;
     const landY = track.nextJump(r.lipX)?.aim?.landY ?? track.heightAt(r.x + 5),
       fall = Math.sqrt(Math.max(0, (2 * (r.y - landY)) / T.airGravity));
-    if (r.airTime + fall >= T.slowmoAir) {
+    const air = r.airTime + fall;
+    if (air >= T.rocketAir && this.clock - this.rocketAt >= T.rocketCooldown && Math.random() < T.rocketChance) return this.launchRocket();
+    if (air >= T.slowmoAir) {
       this.slowmo = 0.4;
       this.cam.punch(-6, 0);
     }
@@ -456,6 +541,10 @@ export class Game {
       r = this.rider;
     this.acc += elapsed;
     this.clock += elapsed;
+    if (this.rocket.active) {
+      this.acc = 0;
+      this.tow(r, elapsed, track);
+    }
     while (this.acc >= dt) {
       this.prev = { x: r.x, y: r.y, pitch: r.pitch };
       r.flow = this.score.flow;
@@ -490,11 +579,15 @@ export class Game {
     this.deepWater(r, elapsed, x, y);
     this.chatter(elapsed, r);
     this.emit(elapsed, r, x, y, pitch);
-    this.trail.update(V.set(x - 0.2 * Math.cos(pitch), y + 0.9, -0.1), r.state === "air" && !this.riderView.yard, this.score.flow >= T.flowMax, elapsed);
-    this.hud.hang(r.state === "air" && r.airTime > 0.9 ? r.airTime : null);
+    this.trail.update(V.set(x - 0.2 * Math.cos(pitch), y + 0.9, -0.1), r.state === "air" && !this.riderView.yard, this.score.flow >= T.flowMax || this.rocket.active, elapsed);
+    this.hud.hang(r.state === "air" && r.airTime > 0.9 && !this.rocket.active ? r.airTime : null);
+    this.hud.warp.update(this.towWarp, real);
     this.fx.update(elapsed, (gx) => track.heightAt(gx));
     this.trackView.update(x);
-    this.cam.update(x, y, track.heightAt(x), speed, real, innerHeight > innerWidth);
+    // Towed, the world rushes by at rocket speed but the camera stays locked tight on PJ and the fish.
+    if (this.towWarp > 0) this.cam.snap();
+    this.cam.update(x, y, track.heightAt(x), this.rocket.active ? Math.min(speed, 16) : speed, real, innerHeight > innerWidth);
+    this.stage.renderer.domElement.style.filter = this.towWarp > 0.01 ? `saturate(${1 + this.towWarp * 0.8}) hue-rotate(${this.towWarp * -35}deg) contrast(${1 + this.towWarp * 0.15})` : "";
     const ground = track.heightAt(x);
     this.backY = Number.isNaN(this.backY) ? ground : this.backY + (ground - this.backY) * Math.min(1, real * 1.5);
     this.backdrop.update(this.stage.camera.position.x, this.backY, this.clock);

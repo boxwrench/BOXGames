@@ -21,11 +21,22 @@ the sun into a Bass God").
 | 5 | The Bass God | Lightning strikes; the sun becomes a crowned, glowing largemouth; a choir sings | +5,000, ×2 for 20 s |
 | 6 | The Sky Is a Lake | The sky floods: water gradient, rising bubbles, giant fish swimming overhead | ×1.5 for 16 s |
 | 7 | Don't Take the Bait | A giant hook with a wriggling worm descends ahead of PJ, then yanks away | +3,000, ×2 for 10 s |
+| 8 | The Tackle Box Opens | Giant painted lures (crankbait, spoon, spinnerbait, curly-tail worm, popper) drift across the sky; low ones cross PJ's path and can be snagged | ×1.5 for 14 s, +250 per lure |
+| 9 | Worm Rapture | The ground rumbles, worms burst out along the trail, then ascend into shafts of golden light | +2,500, ×1.5 for 14 s |
+| 10 | The Bass God Has a Son | Lightning, the Bass God returns with a small haloed son, Kevin ("Hi. I'm Kevin."); Dad Bluegill comments | +6,000, ×2.5 for 20 s |
 
 **Dad Bluegill** (added at the user's request, "more of the absurd proud bluegill father, with outdated advice, like
 50's Leave It to Beaver stuff"): once met, he keeps dropping in every 35–60 s with sitcom-dad advice (+300 each),
 sometimes cheers a huge landing, and consoles PJ on the results screen after a wipeout. Later Proud Bluegill omens use
 his advice instead of the first line. His lines get more lost the deeper the run goes (`dad` in `src/lines.ts`).
+
+**Pikeminnow Rocket** (user-supplied art, "occasionally if you get enough air the pikeminnow rocket will take you into
+the slip stream, like hyperspace"): at the top of an air predicted to last at least 1.5 s, 35 % chance (40 s cooldown), a
+rocket-strapped Sacramento pikeminnow swoops in and PJ grabs its tow line. It tows PJ through a hyperspace slipstream
+(canvas star streaks, tinted world) for 3.2 s and drops PJ just past the sweet spot of the first designed landing at
+least 160 m ahead (`sim/slipstream.ts`, tested on 120 seeds for rideable drops), riding at maxSpeed: +2,500 × multipliers.
+
+The fishing jokes lean NorCal freshwater (the Delta, Clear Lake, Shasta, stripers, sturgeon, steelhead, kokanee).
 
 Omens are presentation plus score effects only — they never change physics, so the 200-seed fairness test stays valid.
 
