@@ -4,7 +4,7 @@ import { mulberry32 } from "../rng";
 const CHUNK = 40,
   STEP = 0.25,
   HALF = 1.8,
-  FLOOR = -40;
+  FLOOR = -12;
 const dirt = new THREE.MeshStandardMaterial({ color: "#c9824a", roughness: 0.95, side: THREE.DoubleSide });
 const soil = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide });
 const grass = new THREE.MeshStandardMaterial({ color: "#6cc04a", roughness: 0.9, side: THREE.DoubleSide });
@@ -59,7 +59,7 @@ export class TrackView {
       face: number[] = [],
       faceColors: number[] = [],
       bank: number[] = [],
-      upper = new THREE.Color("#9a5a32"),
+      upper = new THREE.Color("#b0673a"),
       lower = new THREE.Color("#3a2418");
     for (let k = 0; k < n; k++) {
       const x = x0 + k * STEP,

@@ -2,6 +2,7 @@ import { createStage, type Stage } from "./render/stage";
 import { TrackView } from "./render/trackView";
 import { RiderView } from "./render/riderView";
 import { CameraRig } from "./render/cameraRig";
+import { Backdrop } from "./render/backdrop";
 import { Input } from "./input/input";
 import { Hud } from "./ui/hud";
 import { TrackGen } from "./track/generate";
@@ -14,6 +15,7 @@ export class Game {
   readonly input: Input;
   readonly trackView: TrackView;
   readonly riderView = new RiderView();
+  readonly backdrop = new Backdrop();
   readonly cam: CameraRig;
   gen: TrackGen;
   rider: Rider;
@@ -32,7 +34,7 @@ export class Game {
     this.prevX = this.rider.x;
     this.trackView = new TrackView(this.gen.track);
     this.cam = new CameraRig(this.stage.camera);
-    this.stage.scene.add(this.trackView.root, this.riderView.root);
+    this.stage.scene.add(this.backdrop.root, this.trackView.root, this.riderView.root);
     this.hud.onRestart = () => this.reset();
     addEventListener("resize", () => this.stage.resize());
     addEventListener("keydown", (e) => {
@@ -69,6 +71,7 @@ export class Game {
       y = track.heightAt(x);
     this.riderView.update(x, y, track.angleAt(x), this.rider.pump, this.rider.v, elapsed);
     this.trackView.update(x);
+    this.backdrop.update(this.stage.camera.position.x);
     this.cam.update(x, y, this.rider.v, elapsed, innerHeight > innerWidth);
     this.stage.sun.position.set(x - 12, y + 22, 16);
     this.stage.sun.target.position.set(x, y, 0);
