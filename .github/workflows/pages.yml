@@ -1,0 +1,48 @@
+# Builds the web games and publishes them to GitHub Pages:
+#   https://boxwrench.github.io/BOXGames/pj-dirt-jumper/
+name: Deploy web games to GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths: ["pj-dirt-jumper/**", ".github/workflows/pages.yml", ".github/pages/**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pj-dirt-jumper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: pj-dirt-jumper/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Stage site
+        run: |
+          mkdir -p ../_site/pj-dirt-jumper
+          cp -r dist/. ../_site/pj-dirt-jumper/
+          cp ../.github/pages/index.html ../_site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}pj-dirt-jumper/
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

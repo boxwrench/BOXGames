@@ -1,5 +1,7 @@
 # PJ's Dirt Jumper
 
+**Play:** https://boxwrench.github.io/BOXGames/pj-dirt-jumper/ (deployed by `.github/workflows/pages.yml` on every push to `main` that touches this folder).
+
 Endless side-on arcade dirt jumping. PJ — a sendy teen who'd rather be fishing — pumps, pops and flips down a seeded trail. Stunts give speed; speed gives bigger stunts.
 
 **Status:** Milestone 3 — attitude: scoring, fishing-named combos, Flow meter, slang callouts, particles, slow-mo, yard-sale crashes, golden-hour art and a synth punk soundtrack. Design: [docs/specs](docs/specs/2026-09-22-pj-dirt-jumper-design.md).
