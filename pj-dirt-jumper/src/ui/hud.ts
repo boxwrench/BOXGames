@@ -1,80 +1,111 @@
-import type { BailReason, Grade, Rider, Trick } from "../sim/rider";
+import type { Rider } from "../sim/rider";
+import type { AirScore } from "../score/score";
+import { GRAB_NAMES, flipName } from "../score/score";
 const $ = (root: HTMLElement, sel: string) => root.querySelector<HTMLElement>(sel)!;
-const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)];
-export const GRAB_NAMES = ["Superman", "Tailwhip", "No-Hander"] as const;
 const GRAB_ICONS = ["🐟", "🎣", "🐠"];
-const GRADES: Record<Grade, [string, string]> = {
-  perfect: ["PERFECT!", "BUTTERED AND BATTERED"],
-  buttery: ["Buttery.", ""],
-  clean: ["Clean.", ""],
-  sketchy: ["Sketchy…", "wobbly landing"],
-};
-const ENDINGS: Record<BailReason | "stalled", string[]> = {
-  stalled: ["Skunked.", "Zero bites.", "Ran outta line."],
-  cased: ["Cased it.", "Snagged the knuckle."],
-  huck: ["Huck to flat, bro.", "Flat-landed. Ouch."],
-  sideways: ["Yard sale!", "Landed sideways."],
-  grab: ["Forgot to let go.", "Still holding the grab!"],
-};
-const TIPS: Record<BailReason | "stalled", string> = {
-  stalled: "Pump the backsides to keep your speed.",
-  cased: "Too short. Pump harder and pop the lip.",
-  huck: "Overshot the landing. Save the pop for bigger gaps.",
-  sideways: "Line the bike up with the landing before you touch down.",
-  grab: "Let go of the grab before you land.",
-};
-const FLIP_WORDS = ["", "", "DOUBLE ", "TRIPLE ", "QUAD "];
-export const flipName = (dir: "back" | "front", n: number) => `${FLIP_WORDS[Math.min(n, 4)]}${dir.toUpperCase()}FLIP`;
-export const trickLine = (tricks: Trick[]) =>
-  tricks.map((t) => (t.kind === "flip" ? flipName(t.dir, t.n) : GRAB_NAMES[t.grab].toUpperCase())).join(" + ");
-/** DOM overlay: stats, touch controls, callouts, tier banner and the end card. */
+const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
+export interface RunSummary {
+  title: string;
+  tip: string;
+  score: number;
+  distance: number;
+  best: number;
+  newBest: boolean;
+  bestTrick?: string;
+  bigAir: number;
+}
+/** DOM overlay: stats, score, Flow meter, live trick feed, touch controls, callouts, pop cue and the results card. */
 export class Hud {
   readonly el = document.createElement("div");
   readonly pad: HTMLElement;
   readonly grabButtons: HTMLElement[];
   onRestart = () => {};
+  onMute = () => {};
   private last = 0;
+  private feedText = "";
   private calloutTimer = 0;
   private bannerTimer = 0;
   constructor(parent: HTMLElement) {
     this.el.className = "hud";
     this.el.innerHTML = `
+      <div class="speedlines" data-speedlines></div>
       <div class="stats"><div><b data-speed>0</b><span>KM/H</span></div><div><b data-dist>0</b><span>M</span></div></div>
+      <div class="topright"><div class="score"><b data-score>0</b><span>SCORE</span><small data-best></small></div><button class="mute" data-mute aria-label="Toggle sound">🔊</button></div>
+      <div class="flow" data-flow aria-label="Flow"><span>FLOW</span><i></i><i></i><i></i><i></i><i></i><b>ON FIRE</b></div>
+      <div class="feed" data-feed></div>
       <div class="pad" data-pad aria-label="Hold to pump, drag to spin"><i><span>HOLD · PUMP<br>DRAG · SPIN</span></i></div>
       <div class="grabs">${GRAB_NAMES.map((n, i) => `<button data-grab aria-label="${n}"><span>${GRAB_ICONS[i]}</span><b>${n}</b><kbd>${"JKL"[i]}</kbd></button>`).join("")}</div>
       <p class="tip" data-tip><span class="kb">Hold <kbd>Space</kbd> on downslopes · release on the lip to <b>pop</b> · <kbd>←</kbd><kbd>→</kbd> flip · <kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> grab</span><span class="touch">Hold left side on downslopes · let go on the lip to <b>pop</b> · drag to flip · 🐟🎣🐠 grab</span></p>
       <p class="warn" data-warn>PUMP IT, PJ!</p>
-      <div class="callout" data-callout><b></b><span></span></div>
+      <div class="callout" data-callout><b></b><span></span><em></em></div>
       <div class="banner" data-banner></div>
       <div class="popcue" data-popcue><i></i><b></b></div>
-      <div class="end hidden" data-end role="dialog" aria-label="Run over"><h1 data-title></h1><p data-summary></p><button data-again>SEND IT AGAIN ↻</button></div>`;
+      <div class="end hidden" data-end role="dialog" aria-label="Run over">
+        <h1 data-title></h1>
+        <p class="newbest hidden" data-newbest>🏆 NEW PERSONAL BEST!</p>
+        <dl class="results">
+          <div><dt>SCORE</dt><dd data-r-score></dd></div>
+          <div><dt>DISTANCE</dt><dd data-r-dist></dd></div>
+          <div><dt>BEST</dt><dd data-r-best></dd></div>
+          <div><dt>BIGGEST AIR</dt><dd data-r-air></dd></div>
+        </dl>
+        <p class="trick" data-r-trick></p>
+        <p class="tip2" data-r-tip></p>
+        <button data-again>SEND IT AGAIN ↻</button>
+      </div>`;
     parent.append(this.el);
     this.pad = $(this.el, "[data-pad]");
     this.grabButtons = [...this.el.querySelectorAll<HTMLElement>("[data-grab]")];
     $(this.el, "[data-again]").onclick = () => this.onRestart();
+    $(this.el, "[data-mute]").onclick = () => this.onMute();
   }
-  update(r: Rider) {
+  update(r: Rider, score: number, flow: number, best: number) {
     const now = performance.now();
     if (now - this.last < 80) return;
     this.last = now;
-    $(this.el, "[data-speed]").textContent = String(Math.round((r.state === "air" ? Math.hypot(r.vx, r.vy) : r.v) * 3.6));
+    const speed = r.state === "air" ? Math.hypot(r.vx, r.vy) : r.v;
+    $(this.el, "[data-speed]").textContent = String(Math.round(speed * 3.6));
     $(this.el, "[data-dist]").textContent = String(Math.floor(r.distance));
+    $(this.el, "[data-score]").textContent = fmt(score);
+    $(this.el, "[data-best]").textContent = best ? `BEST ${fmt(best)}` : "";
     $(this.el, "[data-warn]").classList.toggle("show", r.state === "riding" && r.stall > 0.6);
     $(this.el, "[data-tip]").classList.toggle("hidden", r.distance > 150);
+    const meter = $(this.el, "[data-flow]");
+    meter.dataset.level = String(flow);
+    meter.querySelectorAll("i").forEach((pip, i) => pip.classList.toggle("on", i < flow));
+    $(this.el, "[data-speedlines]").style.setProperty("--s", String(Math.max(0, Math.min(1, (speed - 19) / 9))));
   }
-  callout(text: string, sub = "", tone: "trick" | "grade" | "pop" | "bad" = "trick") {
+  /** Live list of what PJ is doing in this air: flips so far and the grab being held. */
+  air(r: Rider) {
+    const parts: string[] = [];
+    if (r.state === "air") {
+      if (r.flips) parts.push(flipName(r.flips > 0 ? "back" : "front", Math.abs(r.flips)).toUpperCase());
+      r.grabTime.forEach((t, i) => {
+        if (t > 0.1 || r.grab === i) parts.push(`${GRAB_ICONS[i]} ${GRAB_NAMES[i].toUpperCase()}`);
+      });
+    }
+    const text = parts.length ? parts.join(" + ") + (parts.length > 1 ? `  ×${parts.length}` : "") : "";
+    if (text === this.feedText) return;
+    this.feedText = text;
+    const feed = $(this.el, "[data-feed]");
+    feed.textContent = text;
+    feed.classList.toggle("show", !!text);
+  }
+  callout(text: string, sub = "", tone: "trick" | "grade" | "pop" | "bad" | "huge" = "trick", points = "") {
     const el = $(this.el, "[data-callout]");
     el.className = `callout show ${tone}`;
     el.querySelector("b")!.textContent = text;
     el.querySelector("span")!.textContent = sub;
+    el.querySelector("em")!.textContent = points;
     void el.offsetWidth; // restart the pop-in animation
     el.classList.add("go");
     clearTimeout(this.calloutTimer);
-    this.calloutTimer = window.setTimeout(() => el.classList.remove("show", "go"), 1300);
+    this.calloutTimer = window.setTimeout(() => el.classList.remove("show", "go"), tone === "huge" ? 2000 : 1400);
   }
-  grade(grade: Grade, tricks: Trick[]) {
-    const [title, sub] = GRADES[grade];
-    this.callout(title, tricks.length ? trickLine(tricks) : sub, grade === "sketchy" ? "bad" : "grade");
+  landing(res: AirScore, line: string) {
+    const tone = res.grade === "sketchy" ? "bad" : res.points >= 5000 ? "huge" : "grade",
+      points = res.points ? `+${fmt(res.points)}${res.multiplier > 1 ? `  ×${res.multiplier}` : ""}` : "";
+    this.callout(line, res.name || (res.grade === "perfect" ? "BUTTERED AND BATTERED" : ""), tone, points);
   }
   banner(text: string) {
     const el = $(this.el, "[data-banner]");
@@ -82,12 +113,6 @@ export class Hud {
     el.classList.add("show");
     clearTimeout(this.bannerTimer);
     this.bannerTimer = window.setTimeout(() => el.classList.remove("show"), 2200);
-  }
-  showEnd(r: Rider, reason: BailReason | "stalled") {
-    $(this.el, "[data-title]").textContent = pick(ENDINGS[reason]);
-    $(this.el, "[data-summary]").textContent = `${Math.floor(r.distance)} m of trail. ${TIPS[reason]}`;
-    $(this.el, "[data-end]").classList.remove("hidden");
-    $(this.el, "[data-again]").focus();
   }
   /**
    * The ring over the next lip: shrinks onto it as PJ arrives. t = seconds to the lip (null hides it).
@@ -106,6 +131,21 @@ export class Hud {
     el.style.top = `${cue.sy}px`;
     el.style.setProperty("--k", String(1 + Math.max(0, cue.t - cue.perfect) * 2.2));
     el.querySelector("b")!.textContent = inWindow ? "LET GO!" : cue.loaded ? "READY…" : "HOLD";
+  }
+  setMuted(muted: boolean) {
+    $(this.el, "[data-mute]").textContent = muted ? "🔇" : "🔊";
+  }
+  showEnd(s: RunSummary) {
+    $(this.el, "[data-title]").textContent = s.title;
+    $(this.el, "[data-newbest]").classList.toggle("hidden", !s.newBest);
+    $(this.el, "[data-r-score]").textContent = fmt(s.score);
+    $(this.el, "[data-r-dist]").textContent = `${Math.floor(s.distance)} m`;
+    $(this.el, "[data-r-best]").textContent = fmt(s.best);
+    $(this.el, "[data-r-air]").textContent = `${s.bigAir.toFixed(1)} s`;
+    $(this.el, "[data-r-trick]").textContent = s.bestTrick ? `Best trick: ${s.bestTrick}` : "";
+    $(this.el, "[data-r-tip]").textContent = s.tip;
+    $(this.el, "[data-end]").classList.remove("hidden");
+    $(this.el, "[data-again]").focus();
   }
   hideEnd() {
     $(this.el, "[data-end]").classList.add("hidden");

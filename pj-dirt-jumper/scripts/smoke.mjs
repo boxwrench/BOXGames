@@ -14,14 +14,15 @@ function chromiumPath() {
 mkdirSync("smoke-out", { recursive: true });
 const browser = await chromium.launch({ executablePath: chromiumPath(), args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
 const problems = [];
+const window_has_bail = (log) => log.includes("bail");
 for (const [name, viewport] of [["desktop", { width: 1440, height: 900 }], ["phone-landscape", { width: 844, height: 390 }], ["phone-portrait", { width: 390, height: 844 }]]) {
   const page = await browser.newPage({ viewport, hasTouch: name !== "desktop" });
   page.on("pageerror", (e) => problems.push(`${name}: ${e.message}`));
   page.on("console", (m) => m.type() === "error" && problems.push(`${name}: ${m.text()}`));
-  await page.goto(url + (url.includes("?") ? "&" : "?") + "autopilot=1");
+  await page.goto(url + (url.includes("?") ? "&" : "?") + "autopilot=tricks");
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `smoke-out/${name}-start.png` });
-  // Let the reference bot ride; grab a screenshot the first time PJ is airborne.
+  // Let the stunt bot ride; screenshot the pop cue and PJ mid-flight the first time each happens.
   let airShot = false,
     cueShot = false;
   const until = Date.now() + 14000;
@@ -32,18 +33,41 @@ for (const [name, viewport] of [["desktop", { width: 1440, height: 900 }], ["pho
       cueShot = true;
     }
     if (air && !airShot) {
-      await page.waitForTimeout(700); // mid-flight, so the arc and landing are in frame
+      await page.waitForTimeout(700); // mid-flight, so the arc, trick and landing are in frame
       await page.screenshot({ path: `smoke-out/${name}-air.png` });
       airShot = true;
     }
     await page.waitForTimeout(40);
   }
   await page.screenshot({ path: `smoke-out/${name}-riding.png` });
-  const state = await page.evaluate(() => ({ x: Math.round(window.game.rider.x), state: window.game.rider.state, log: window.game.log.filter((t) => t !== "flip").slice(-8) }));
+  const state = await page.evaluate(() => ({
+    x: Math.round(window.game.rider.x),
+    state: window.game.rider.state,
+    score: window.game.score.total,
+    log: window.game.log.filter((t) => t !== "flip").slice(-8),
+  }));
   console.log(name, state);
   if (state.x < 30) problems.push(`${name}: rider barely moved (${state.x} m)`);
-  if (state.log.includes("bail") || state.state === "bailed") problems.push(`${name}: autopilot bailed`);
+  if (state.state === "bailed" || window_has_bail(state.log)) problems.push(`${name}: autopilot bailed`);
   if (!airShot) problems.push(`${name}: never got air`);
+  if (!(state.score > 0)) problems.push(`${name}: score stayed at ${state.score}`);
+  // Force a yard sale: hold a grab through the next landing (always a bail).
+  for (let i = 0; i < 250; i++) {
+    if (await page.evaluate(() => window.game.rider.state === "air")) break;
+    await page.waitForTimeout(40);
+  }
+  await page.evaluate(() => (window.game.autopilot = false));
+  await page.keyboard.down("KeyJ");
+  for (let i = 0; i < 250; i++) {
+    if (await page.evaluate(() => window.game.rider.state === "bailed")) break;
+    await page.waitForTimeout(20);
+  }
+  await page.keyboard.up("KeyJ");
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `smoke-out/${name}-bail.png` });
+  await page.waitForTimeout(2600);
+  await page.screenshot({ path: `smoke-out/${name}-end.png` });
+  if (await page.evaluate(() => document.querySelector("[data-end]").classList.contains("hidden"))) problems.push(`${name}: results card never showed after the bail`);
   await page.close();
 }
 await browser.close();
