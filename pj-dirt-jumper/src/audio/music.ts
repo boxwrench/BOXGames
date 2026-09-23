@@ -3,6 +3,8 @@ import { mulberry32 } from "../rng";
 export type StyleName = "punk" | "surf" | "ska" | "chip" | "dbeat" | "sludge" | "hyperspace";
 export interface Style {
   bpm: number;
+  /** Loudness trim so every style sits at the same level (measured with scripts/loudness.mjs). */
+  gain: number;
   /** 16-step drum patterns: x = hit, o = soft hit. */
   kick: string;
   snare: string;
@@ -23,6 +25,7 @@ const MINOR_PENTA = [0, 3, 5, 7, 10],
 export const STYLES: Record<StyleName, Style> = {
   // The original: skate punk, power chords on eighths.
   punk: {
+    gain: 1,
     bpm: 160,
     kick: "x.......x.x.....",
     snare: "....x.......x...",
@@ -40,6 +43,7 @@ export const STYLES: Record<StyleName, Style> = {
   },
   // Dick Dale on a dirt jump: tremolo picking, tom-heavy beat, harmonic minor lead.
   surf: {
+    gain: 0.81,
     bpm: 172,
     kick: "x..x..x.x..x..x.",
     snare: "....x.......x..o",
@@ -56,6 +60,7 @@ export const STYLES: Record<StyleName, Style> = {
   },
   // Offbeat upstrokes and a walking bass.
   ska: {
+    gain: 1.65,
     bpm: 150,
     kick: "x.......x.......",
     snare: "....x.......x...",
@@ -72,6 +77,7 @@ export const STYLES: Record<StyleName, Style> = {
   },
   // 8-bit: square-wave arpeggios, I–V–vi–IV.
   chip: {
+    gain: 1.15,
     bpm: 150,
     kick: "x...x...x...x...",
     snare: "....x.......x...",
@@ -88,6 +94,7 @@ export const STYLES: Record<StyleName, Style> = {
   },
   // Fast and furious: d-beat drums, palm-muted sixteenths.
   dbeat: {
+    gain: 0.66,
     bpm: 190,
     kick: "x..xx...x..xx...",
     snare: "..x...x...x...x.",
@@ -104,6 +111,7 @@ export const STYLES: Record<StyleName, Style> = {
   },
   // Heavy half-time: long ringing chords, one snare a bar.
   sludge: {
+    gain: 0.93,
     bpm: 140,
     kick: "x.....x.x.......",
     snare: "........x.......",
@@ -120,6 +128,7 @@ export const STYLES: Record<StyleName, Style> = {
   },
   // Only in the slipstream: synthwave arps.
   hyperspace: {
+    gain: 1.38,
     bpm: 128,
     kick: "x...x...x...x...",
     snare: "....x.......x...",

@@ -22,7 +22,9 @@ const RESPELL: [RegExp, string][] = [
 ];
 export const sayable = (text: string) => RESPELL.reduce((t, [re, to]) => t.replace(re, to), text.replace(/[!?.…]+$/g, (m) => m[0]));
 const PENTA = [0, 3, 5, 7, 10];
-const E2 = 82.41;
+const E2 = 82.41,
+  MUSIC_LEVEL = 0.32,
+  b0 = (s: number) => s % 16 === 0;
 /** The rocket's slipstream always gets the synthwave track. */
 const WARP_SONG: Song = { style: "hyperspace", key: 0, progression: [0, 8, 3, 10], motif: [0, 2, 4, 5, 4, 2, 3, -1, 5, 4, 2, 0, 1, 2, -1, 3], title: "Hyperspace Bait", band: "Pikeminnow Rocket" };
 /**
@@ -35,6 +37,8 @@ export class Sound {
   private ctx?: AudioContext;
   private master?: GainNode;
   private musicBus?: GainNode;
+  /** After the leveler: what the music actually sounds like (also where scripts/loudness.mjs listens). */
+  private musicOut?: GainNode;
   private noise?: AudioBuffer;
   private dist?: WaveShaperNode;
   private tyre?: { gain: GainNode; filter: BiquadFilterNode };
@@ -59,8 +63,18 @@ export class Sound {
       this.master.gain.value = this.muted ? 0 : 0.8;
       this.master.connect(comp).connect(c.destination);
       this.musicBus = c.createGain();
-      this.musicBus.gain.value = 0.32;
-      this.musicBus.connect(this.master);
+      this.musicBus.gain.value = MUSIC_LEVEL;
+      // A leveler evens out songs, keys and sections so nothing drops out or jumps out.
+      const level = c.createDynamicsCompressor();
+      level.threshold.value = -30;
+      level.knee.value = 12;
+      level.ratio.value = 5;
+      level.attack.value = 0.02;
+      level.release.value = 0.4;
+      this.musicOut = c.createGain();
+      // The compressor adds its own make-up gain; this brings the music back to where the original soundtrack sat.
+      this.musicOut.gain.value = 0.6;
+      this.musicBus.connect(level).connect(this.musicOut).connect(this.master);
       this.noise = c.createBuffer(1, c.sampleRate, c.sampleRate);
       const d = this.noise.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -342,7 +356,10 @@ export class Sound {
     }
   }
   private beat(song: Song, s: number, at: number) {
-    const st = STYLES[song.style],
+    const st = STYLES[song.style];
+    // Each style's loudness trim, eased in so song changes don't jump.
+    if (b0(s) && this.musicBus!.gain.value !== MUSIC_LEVEL * st.gain) this.musicBus!.gain.setTargetAtTime(MUSIC_LEVEL * st.gain, at, 0.3);
+    const
       b = s % 16,
       bar = Math.floor(s / 16),
       sec = sectionAt(bar),
@@ -352,22 +369,23 @@ export class Sound {
       key = E2 * Math.pow(2, song.key / 12),
       root = key * Math.pow(2, song.progression[bar % song.progression.length] / 12),
       third = st.scale.includes(4) ? 1.26 : 1.19,
-      drums = sec.kind !== "intro",
+      intro = sec.kind === "intro",
       harmony = sec.kind !== "break";
     // Drums
-    const fill = drums && sec.fill && f >= 1 && b >= 12;
-    if (drums && st.kick[b] === "x") this.voice({ f0: 150, f1: 40, dur: 0.16, vol: 0.9, at }, bus);
-    if (drums && f >= 1 && (st.snare[b] !== "." || fill)) {
+    // Intros hold the snare back for the verse, but keep the kick, hats and bass so a new song never dips.
+    const fill = !intro && sec.fill && f >= 1 && b >= 12;
+    if (st.kick[b] === "x") this.voice({ f0: 150, f1: 40, dur: 0.16, vol: 0.9, at }, bus);
+    if (!intro && f >= 1 && (st.snare[b] !== "." || fill)) {
       const soft = st.snare[b] === "o" || (fill && st.snare[b] === "."),
         vol = fill ? 0.25 + (b - 12) * 0.08 : soft ? 0.2 : 0.45;
       this.hiss({ at, dur: 0.12, vol, filter: { type: "bandpass", f0: 1800, q: 0.8 } }, bus);
       this.voice({ type: "triangle", f0: 210, f1: 160, dur: 0.08, vol: vol * 0.45, at }, bus);
     }
-    if (f >= 1 && (st.hat[b] === "x" || (f >= 3 && b % 2 === 1))) this.hiss({ at, dur: 0.025, vol: st.hat[b] === "x" ? 0.12 : 0.06, filter: { type: "highpass", f0: 7000 } }, bus);
+    if ((f >= 1 || intro) && (st.hat[b] === "x" || (f >= 3 && b % 2 === 1))) this.hiss({ at, dur: 0.025, vol: st.hat[b] === "x" ? 0.12 : 0.06, filter: { type: "highpass", f0: 7000 } }, bus);
     if (f >= 2 && sec.first && b === 0 && sec.kind === "chorus") this.hiss({ at, dur: 1.2, vol: 0.25, filter: { type: "highpass", f0: 5000 } }, bus);
     if (f >= 5 && b === 0 && s % 32 === 0) this.hiss({ at, dur: 0.8, vol: 0.2, filter: { type: "highpass", f0: 5000 } }, bus);
     // Bass
-    if (drums) {
+    {
       const low = root / 2;
       if (st.bass === "eighths" && b % 2 === 0) this.voice({ type: "triangle", f0: low, dur: 0.12, vol: 0.3, at }, bus);
       if (st.bass === "walk" && b % 4 === 0) this.voice({ type: "triangle", f0: low * Math.pow(2, [0, 7, 12, 10][b / 4] / 12), dur: 0.2, vol: 0.32, at }, bus);
@@ -376,7 +394,7 @@ export class Sound {
     }
     // Chords
     if (harmony) {
-      const quiet = sec.kind === "intro" ? 0.6 : 1,
+      const quiet = intro ? 0.85 : 1,
         full = f >= 2 ? [1, 1.5, 2] : [1];
       switch (st.chords) {
         case "power":
@@ -389,13 +407,13 @@ export class Sound {
           if (b === 0 || b === 8) for (const k of full) this.voice({ type: st.wave, f0: root * k, dur: 0.9, vol: 0.13 * quiet, at }, this.dist);
           break;
         case "upstroke":
-          if (b % 4 === 2) for (const k of [1, third, 1.5]) this.voice({ type: st.wave, f0: root * 2 * k, dur: 0.08, vol: 0.05 * quiet, at, filter: { type: "lowpass", f0: 3500 } }, bus);
+          if (b % 4 === 2) for (const k of [1, third, 1.5]) this.voice({ type: st.wave, f0: root * 2 * k, dur: 0.08, vol: 0.09 * quiet, at, filter: { type: "lowpass", f0: 3500 } }, bus);
           break;
         case "tremolo":
           for (const k of f >= 2 ? [2, 3] : [2]) this.voice({ type: st.wave, f0: root * k, dur: 0.06, vol: 0.07 * quiet, at }, this.dist);
           break;
         case "arp":
-          this.voice({ type: st.wave, f0: root * 2 * [1, third, 1.5, 2][b % 4], dur: 0.1, vol: 0.06 * quiet, at, filter: { type: "lowpass", f0: 2400 + f * 500 } }, bus);
+          this.voice({ type: st.wave, f0: root * 2 * [1, third, 1.5, 2][b % 4], dur: 0.1, vol: 0.08 * quiet, at, filter: { type: "lowpass", f0: 2400 + f * 500 } }, bus);
           break;
       }
     }
