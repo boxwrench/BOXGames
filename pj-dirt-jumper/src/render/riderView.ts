@@ -112,24 +112,38 @@ export class RiderView {
       this.body.add(limb);
       this.limbs.push(limb);
     }
-    this.torso = ink(new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.19, 1, 12), tee), [1.14, 1.02, 1.14]);
+    this.torso = ink(new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.55, 6, 14), tee), [1.14, 1.02, 1.14]);
     this.torso.castShadow = true;
-    // Full-face helmet: teal shell, chin bar, peak, and a dark goggle visor with an orange strap.
-    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.25, 24, 18), teal),
-      chin = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 10), teal),
-      peak = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.04, 0.34), teal),
-      visor = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 12, -0.9, 1.8, 1.05, 0.6), mat("#15121c", 0.15)),
-      strap = new THREE.Mesh(new THREE.TorusGeometry(0.245, 0.02, 6, 28), mat("#ff8c2a"));
-    chin.scale.set(1, 0.7, 1.15);
-    chin.position.set(0.1, -0.13, 0);
-    peak.position.set(0.18, 0.16, 0);
-    peak.rotation.z = -0.25;
-    visor.position.set(0.08, -0.02, 0);
-    visor.rotation.y = Math.PI / 2;
-    strap.rotation.y = Math.PI / 2;
-    strap.position.y = 0.02;
-    for (const m of [shell, chin, peak]) m.castShadow = true;
-    this.head.add(shell, chin, peak, visor, strap);
+    // Full-face MTB helmet seen side-on (facing +x): a long rounded shell, a chin bar jutting forward, a dark goggle
+    // port with a mirrored lens, a short peak and vents.
+    const shellGeo = new THREE.SphereGeometry(0.23, 28, 20),
+      shell = new THREE.Mesh(shellGeo, teal),
+      chin = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.2, 6, 12), teal),
+      port = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.32), mat("#0f0d14", 0.6)),
+      lens = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.105, 0.3), new THREE.MeshStandardMaterial({ color: "#ff5a2e", roughness: 0.12, metalness: 0.5, emissive: "#b8401a", emissiveIntensity: 0.9 })),
+      shine = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.022, 0.22), new THREE.MeshBasicMaterial({ color: "#fff1d6" })),
+      gogFrame = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.135, 0.34), mat("#15121c", 0.5)),
+      peak = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.026, 0.3), teal),
+      strap = new THREE.Mesh(new THREE.SphereGeometry(0.233, 28, 20, 0, Math.PI * 2, 1.45, 0.2), mat("#15121c", 0.5));
+    shell.scale.set(1.12, 1, 0.92);
+    strap.scale.set(1.12, 1, 0.92);
+    chin.rotation.z = Math.PI / 2 + 0.5;
+    chin.position.set(0.15, -0.155, 0);
+    chin.scale.set(1, 1, 1.45);
+    port.position.set(0.2, -0.015, 0);
+    gogFrame.position.set(0.235, -0.005, 0);
+    lens.position.set(0.262, -0.005, 0);
+    shine.position.set(0.288, 0.025, 0);
+    peak.position.set(0.21, 0.14, 0);
+    peak.rotation.z = -0.35;
+    for (const m of [shell, chin, peak, gogFrame]) m.castShadow = true;
+    this.head.add(shell, strap, chin, port, gogFrame, lens, shine, peak);
+    for (const z of [-0.06, 0, 0.06]) {
+      const vent = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.025), mat("#15121c", 0.6));
+      vent.position.set(-0.02, 0.225, z);
+      vent.rotation.z = 0.1;
+      this.head.add(vent);
+    }
     const bag = ink(new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.4, 0.34), mat("#23222b", 0.8)), [1.12, 1.08, 1.08]),
       lure = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.14, 0.04), mat("#ffd23a")),
       tail = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.07, 6), mat("#ff3b2f"));
@@ -189,7 +203,7 @@ export class RiderView {
       aim(this.limbs[i++], elbow, hand);
     }
     aim(this.torso, hip, shoulder);
-    this.head.position.copy(shoulder).add(v(0.1, 0.27));
+    this.head.position.copy(shoulder).add(v(0.12, 0.24));
     this.pack.position.copy(hip).lerp(shoulder, 0.6).add(v(-0.22, 0));
     this.pack.rotation.z = this.torso.rotation.z;
   }

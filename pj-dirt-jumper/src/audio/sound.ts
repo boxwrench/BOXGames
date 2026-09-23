@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-export type Cue = "pop" | "perfectPop" | "land" | "perfect" | "sketchy" | "trick" | "reel" | "bail" | "flowUp" | "onFire" | "stall" | "best";
+export type Cue = "pop" | "perfectPop" | "land" | "perfect" | "sketchy" | "trick" | "reel" | "bail" | "flowUp" | "onFire" | "stall" | "best" | "airhorn" | "cheer" | "whoosh" | "slam";
 interface Voice {
   type?: OscillatorType;
   f0: number;
@@ -179,6 +179,29 @@ export class Sound {
         break;
       case "stall":
         this.voice({ type: "triangle", f0: 392, f1: 196, dur: 0.9, vol: 0.2 });
+        break;
+      case "airhorn":
+        // Three stadium-horn blasts: detuned saw chord, the last one held.
+        for (const [at, len] of [
+          [0, 0.13],
+          [0.18, 0.13],
+          [0.36, 0.55],
+        ])
+          for (const f of [415, 419, 523, 527])
+            this.voice({ type: "sawtooth", f0: f, f1: f * 0.97, dur: len, vol: 0.07, at: t + at, attack: 0.01, filter: { type: "lowpass", f0: 3200 } });
+        break;
+      case "cheer":
+        // Crowd roar: band-passed noise swells, with a few whistles on top.
+        this.hiss({ dur: 1.4, vol: 0.28, attack: 0.25, filter: { type: "bandpass", f0: 900, f1: 1600, q: 0.6 } });
+        this.hiss({ dur: 1.2, vol: 0.18, attack: 0.2, rate: 1.4, filter: { type: "bandpass", f0: 2400, q: 1 } });
+        for (let i = 0; i < 2; i++) this.voice({ f0: 1900 + i * 300, f1: 2600 + i * 200, dur: 0.25, vol: 0.05, at: t + 0.2 + i * 0.35 });
+        break;
+      case "whoosh":
+        this.hiss({ dur: 0.45, vol: 0.4, attack: 0.08, filter: { type: "bandpass", f0: 3500, f1: 400, q: 1.2 } });
+        break;
+      case "slam":
+        this.voice({ f0: 70, f1: 30, dur: 0.4, vol: 0.9 });
+        this.hiss({ dur: 0.12, vol: 0.4, filter: { type: "highpass", f0: 1500 } });
         break;
       case "best":
         [523, 659, 784, 1046, 1318].forEach((f, i) => this.voice({ type: "square", f0: f, dur: 0.16, vol: 0.08, at: t + i * 0.08 }));

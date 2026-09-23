@@ -51,18 +51,12 @@ for (const [name, viewport] of [["desktop", { width: 1440, height: 900 }], ["pho
   if (state.state === "bailed" || window_has_bail(state.log)) problems.push(`${name}: autopilot bailed`);
   if (!airShot) problems.push(`${name}: never got air`);
   if (!(state.score > 0)) problems.push(`${name}: score stayed at ${state.score}`);
-  // Force a yard sale: hold a grab through the next landing (always a bail).
+  // Force a yard sale mid-air.
   for (let i = 0; i < 250; i++) {
     if (await page.evaluate(() => window.game.rider.state === "air")) break;
     await page.waitForTimeout(40);
   }
-  await page.evaluate(() => (window.game.autopilot = false));
-  await page.keyboard.down("KeyJ");
-  for (let i = 0; i < 250; i++) {
-    if (await page.evaluate(() => window.game.rider.state === "bailed")) break;
-    await page.waitForTimeout(20);
-  }
-  await page.keyboard.up("KeyJ");
+  await page.evaluate(() => window.game.crash());
   await page.waitForTimeout(600);
   await page.screenshot({ path: `smoke-out/${name}-bail.png` });
   await page.waitForTimeout(2600);

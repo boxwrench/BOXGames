@@ -11,6 +11,9 @@ interface Puff {
   size: number;
   grow: number;
   alpha: number;
+  /** Fire cools through FIRE_RAMP; sparks and flashes keep their colour. */
+  ramp: boolean;
+  gravity: number;
 }
 /** Radial white-to-clear blob used by every soft sprite (dust, fire, clouds, glow, blurred foliage). */
 export function softTexture() {
@@ -56,7 +59,7 @@ export class FX {
         );
         s.visible = false;
         this.root.add(s);
-        into.push({ s, v: new THREE.Vector3(), life: 0, max: 1, size: 1, grow: 1, alpha: 1 });
+        into.push({ s, v: new THREE.Vector3(), life: 0, max: 1, size: 1, grow: 1, alpha: 1, ramp: false, gravity: 0 });
       }
     };
     pool(PUFFS, false, this.puffs);
@@ -92,6 +95,8 @@ export class FX {
       p.size = (o.size ?? 1) * (0.6 + Math.random() * 0.6);
       p.grow = 1.5 + Math.random();
       p.alpha = o.alpha ?? 0.7;
+      p.ramp = false;
+      p.gravity = 0;
       p.s.material.color.set(o.color ?? "#e8c79a");
       p.s.material.rotation = Math.random() * 6;
       p.s.visible = true;
@@ -107,8 +112,32 @@ export class FX {
       p.size = 0.5 + Math.random() * 0.4;
       p.grow = -0.6;
       p.alpha = 1;
+      p.ramp = true;
+      p.gravity = 0;
       p.s.visible = true;
     }
+  }
+  /** Bright additive sparks bursting outward and falling — perfect landings, big combos. */
+  sparks(at: THREE.Vector3, n: number, color: THREE.ColorRepresentation = "#ffe9a0", power = 1) {
+    for (let i = 0; i < n; i++) {
+      const p = this.spawn(this.fires),
+        a = Math.random() * Math.PI * 2,
+        speed = (5 + Math.random() * 9) * power;
+      p.s.position.copy(at);
+      p.v.set(Math.cos(a) * speed, Math.abs(Math.sin(a)) * speed * 0.9 + 2, (Math.random() - 0.5) * 4);
+      p.max = p.life = 0.35 + Math.random() * 0.35;
+      p.size = 0.18 + Math.random() * 0.22;
+      p.grow = -0.7;
+      p.alpha = 1;
+      p.ramp = false;
+      p.gravity = 16;
+      p.s.material.color.set(color);
+      p.s.visible = true;
+    }
+  }
+  /** Party time: confetti in PJ's colours. */
+  confetti(at: THREE.Vector3, n: number) {
+    for (const c of ["#ff4fa3", "#c6ff3d", "#3fd3b0", "#ffd23a", "#ff8c2a"]) this.clods(at, Math.ceil(n / 5), new THREE.Vector2(0, 9), 9, c);
   }
   /** Dirt clods thrown with velocity vel (x, y) ± spread; they tumble, bounce on the trail and shrink away. */
   clods(at: THREE.Vector3, n: number, vel: THREE.Vector2, spread = 2, color: THREE.ColorRepresentation = "#8a5230") {
@@ -142,6 +171,8 @@ export class FX {
     p.size = size;
     p.grow = 1.2;
     p.alpha = 1;
+    p.ramp = false;
+    p.gravity = 0;
     p.s.material.color.set(color);
     p.s.visible = true;
   }
@@ -168,9 +199,10 @@ export class FX {
         continue;
       }
       const t = 1 - p.life / p.max;
+      p.v.y -= p.gravity * dt;
       p.s.position.addScaledVector(p.v, dt);
       p.s.scale.setScalar(Math.max(0.05, p.size * (1 + t * p.grow)));
-      if (p.grow < 0) {
+      if (p.ramp) {
         const k = Math.min(FIRE_RAMP.length - 1.001, t * (FIRE_RAMP.length - 1)),
           i = Math.floor(k);
         p.s.material.color.copy(FIRE_RAMP[i]).lerp(FIRE_RAMP[i + 1], k - i);

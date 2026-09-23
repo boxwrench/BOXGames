@@ -72,3 +72,33 @@
 @media (max-width:600px){.results{grid-template-columns:repeat(2,auto)}.score b{font-size:30px}}
 @media (orientation:landscape) and (max-height:500px){.flow{top:auto;bottom:calc(max(20px,env(safe-area-inset-bottom)) + 84px)}.end h1{font-size:44px}.results{padding:8px 14px}.results dd{font-size:18px}}
 @media (orientation:portrait){.feed{top:17%;font-size:15px}}
+/* ——— Over-the-top feedback ——— */
+.flash{position:absolute;inset:0;opacity:0;pointer-events:none;mix-blend-mode:screen}.flash.go{animation:flash .28s ease-out}
+@keyframes flash{from{opacity:.85}to{opacity:0}}
+.edge{position:absolute;inset:0;opacity:0;pointer-events:none;box-shadow:inset 0 0 120px 30px var(--c,#c6ff3d)}.edge.go{animation:edge .9s ease-out}
+@keyframes edge{0%{opacity:0}15%{opacity:1}100%{opacity:0}}
+.zoomlines{position:absolute;inset:-20%;opacity:0;pointer-events:none;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,245,220,.55) 0 1.2deg,transparent 1.2deg 9deg);-webkit-mask-image:radial-gradient(circle at 50% 50%,transparent 0 22%,#000 60%);mask-image:radial-gradient(circle at 50% 50%,transparent 0 22%,#000 60%)}
+.zoomlines.go{animation:zoomlines .55s ease-out}
+@keyframes zoomlines{0%{opacity:0;transform:scale(1.4) rotate(0)}20%{opacity:1}100%{opacity:0;transform:scale(1) rotate(4deg)}}
+.floaters{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.floater{position:absolute;translate:-50% -50%;font-size:28px;font-weight:900;color:#ffd23a;-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;text-shadow:0 4px 0 var(--ink);white-space:nowrap;animation:floater 1.3s cubic-bezier(.2,1.4,.4,1) forwards}
+.floater.big{font-size:44px;background:linear-gradient(180deg,#fff3b0,#ffb13b 55%,#ff4f2e);-webkit-background-clip:text;background-clip:text;color:transparent}
+@keyframes floater{0%{transform:scale(.2) translateY(0);opacity:0}15%{transform:scale(1.3) translateY(-20px);opacity:1}35%{transform:scale(1) translateY(-40px)}75%{opacity:1}100%{transform:scale(.8) translate(40vw,-45vh);opacity:0}}
+.hang{position:absolute;left:50%;top:26%;translate:-50% 0;font-size:clamp(18px,3vw,30px);font-weight:900;letter-spacing:2px;color:#8ff7ff;-webkit-text-stroke:1.5px var(--ink);paint-order:stroke fill;text-shadow:0 0 16px #3fd3b0,0 3px 0 var(--ink);opacity:0;transition:opacity .15s}
+.hang.show{opacity:1;animation:hangpulse .5s ease-in-out infinite alternate}
+@keyframes hangpulse{to{transform:scale(1.08)}}
+/* Callouts slam in like stickers: huge, tilted, combo name on a slab. */
+.callout b{font-size:clamp(40px,7.5vw,92px);font-style:italic;letter-spacing:-2px;-webkit-text-stroke:3px var(--ink);text-shadow:0 7px 0 var(--ink),0 0 30px #0006;transform:rotate(-4deg)}
+.callout span{font-size:clamp(14px,2vw,20px);font-style:italic;color:var(--ink);background:var(--lime);border:3px solid var(--ink);padding:6px 16px;border-radius:6px;transform:skew(-12deg) rotate(-2deg);box-shadow:0 5px 0 var(--ink)}
+.callout.bad span{background:var(--pink)}.callout.huge span{background:#ffd23a}
+.callout em{font-size:clamp(22px,3.6vw,36px)}
+.callout.go{animation:slam .42s cubic-bezier(.2,1.7,.35,1)}
+.callout.huge.go{animation:slam .5s cubic-bezier(.2,1.9,.35,1),shake .45s .5s}
+@keyframes slam{0%{transform:scale(3.2) rotate(-14deg);opacity:0;filter:blur(8px)}55%{transform:scale(.9) rotate(2deg);opacity:1;filter:none}80%{transform:scale(1.06) rotate(-1deg)}100%{transform:scale(1) rotate(0)}}
+.callout.pop b{font-size:clamp(28px,5vw,56px)}
+@media (reduced-motion:reduce),(prefers-reduced-motion:reduce){.zoomlines,.flash,.edge,.speedlines{display:none}}
+/* Lanes so stacked feedback never overlaps: feed top, callout upper-middle, banner middle, hang time lower. */
+.banner{top:48%}
+.hang{top:66%}
+@media (pointer:coarse){.hang{top:24%}.banner{top:60%;font-size:clamp(18px,3.4vw,30px)}}
+@media (orientation:landscape) and (max-height:500px){.callout b{font-size:clamp(30px,6vw,56px)}.feed{top:3%}}

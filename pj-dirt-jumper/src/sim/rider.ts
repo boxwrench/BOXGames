@@ -9,7 +9,7 @@ export interface Actions {
 export const NO_ACTIONS: Actions = { pump: false, spin: 0, grab: [false, false, false] };
 export type RiderState = "riding" | "air" | "bailed" | "stalled";
 export type Grade = "perfect" | "buttery" | "clean" | "sketchy";
-export type BailReason = "cased" | "huck" | "sideways" | "grab";
+export type BailReason = "cased" | "huck" | "sideways";
 export type Trick = { kind: "flip"; dir: "back" | "front"; n: number } | { kind: "grab"; grab: number; seconds: number; releasedAt: number };
 export type SimEvent =
   | { type: "stalled" }
@@ -128,7 +128,9 @@ function ride(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   r.distance += r.v * dt;
   if (jump && nx >= jump.lipX && r.v >= T.minLaunchSpeed) {
     const angle = track.angleAt(jump.lipX - 1e-6),
-      boost = r.popLip === jump.lipX ? r.pop : 0,
+      manual = r.popLip === jump.lipX,
+      // Every lip gives some lift; a manual pop replaces it with more.
+      boost = manual ? r.pop : T.autoPop,
       y = track.heightAt(jump.lipX),
       vx = r.v * Math.cos(angle),
       vy = r.v * Math.sin(angle) + boost;
@@ -150,7 +152,7 @@ function ride(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
       pop: 0,
       popLip: NaN,
       lipX: jump.lipX,
-      popped: boost > 0,
+      popped: manual,
       stall: 0,
       state: "air",
     } satisfies Partial<Rider>);
@@ -187,7 +189,7 @@ function fly(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   const events: SimEvent[] = [];
   // Late pop: letting go just after leaving the lip still counts (arcade grace).
   if (!r.popped && r.airTime <= T.latePop && r.pump && !a.pump && r.preload > 0) {
-    r.vy += T.popBoost * r.preload;
+    r.vy += Math.max(0, T.popBoost * r.preload - T.autoPop);
     r.popped = true;
     const jump = track.nextJump(r.lipX);
     if (jump) r.vx = steer(jump, r.x, r.y, r.vx, r.vy);
@@ -230,16 +232,24 @@ function fly(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
     along = r.vx * Math.cos(angle) + r.vy * Math.sin(angle),
     impact = r.vx * Math.sin(angle) - r.vy * Math.cos(angle);
   let bail: BailReason | undefined;
-  if (r.grabBlend > 0) bail = "grab";
-  else if (err > T.landSketchy) bail = "sideways";
+  if (err > T.landSketchy) bail = "sideways";
   else if (angle > T.downslope && impact > T.huckImpact) bail = angle > T.upslope ? "cased" : "huck";
   if (bail) {
     r.state = "bailed";
     events.push({ type: "bail", reason: bail });
     return events;
   }
+  // Touching down mid-grab is forgiven, but it's never better than sketchy.
   const grade: Grade =
-    err <= T.landPerfect && angle <= T.downslope ? "perfect" : err <= T.landButtery ? "buttery" : err <= T.landClean ? "clean" : "sketchy";
+    r.grabBlend > 0
+      ? "sketchy"
+      : err <= T.landPerfect && angle <= T.downslope
+        ? "perfect"
+        : err <= T.landButtery
+          ? "buttery"
+          : err <= T.landClean
+            ? "clean"
+            : "sketchy";
   const tricks: Trick[] = [];
   if (r.flips) tricks.push({ kind: "flip", dir: r.flips > 0 ? "back" : "front", n: Math.abs(r.flips) });
   r.grabTime.forEach((seconds, grab) => {

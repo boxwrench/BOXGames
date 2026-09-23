@@ -5,6 +5,7 @@ import { RiderView } from "./render/riderView";
 import { CameraRig } from "./render/cameraRig";
 import { Backdrop } from "./render/backdrop";
 import { FX } from "./render/fx";
+import { Trail } from "./render/trail";
 import { Input } from "./input/input";
 import { Hud } from "./ui/hud";
 import { TrackGen } from "./track/generate";
@@ -22,7 +23,6 @@ const TIPS: Record<BailReason | "stalled", string> = {
   cased: "Too short. Pump harder and pop the lip.",
   huck: "Overshot onto the flat. Line up with the landing.",
   sideways: "Line the bike up with the landing before you touch down.",
-  grab: "Let go of the grab before you land.",
 };
 const GRADE_LINES = { perfect: "BUTTERED!", buttery: "Buttery.", clean: "Clean." } as const;
 const V = new THREE.Vector3(),
@@ -36,6 +36,7 @@ export class Game {
   readonly riderView = new RiderView();
   readonly backdrop = new Backdrop();
   readonly fx = new FX();
+  readonly trail = new Trail();
   readonly sound = new Sound();
   readonly lines = new Lines();
   readonly cam: CameraRig;
@@ -63,6 +64,7 @@ export class Game {
   private bailLine = "";
   private frozen = false;
   private ended = false;
+  private wasGrabbing = false;
   constructor(
     container: HTMLElement,
     public seed: number,
@@ -76,7 +78,8 @@ export class Game {
     this.rider = createRider();
     this.trackView = new TrackView(this.gen.track);
     this.cam = new CameraRig(this.stage.camera);
-    this.stage.scene.add(this.backdrop.root, this.trackView.root, this.riderView.root, this.fx.root);
+    if (new URLSearchParams(location.search).has("closeup")) this.cam.zoom = 0.28;
+    this.stage.scene.add(this.backdrop.root, this.trackView.root, this.riderView.root, this.fx.root, this.trail.mesh);
     this.hud.onRestart = () => this.reset();
     this.hud.onMute = () => {
       this.sound.toggle();
@@ -110,6 +113,8 @@ export class Game {
     this.frozen = this.ended = false;
     this.riderView.reassemble();
     this.fx.clear();
+    this.trail.clear();
+    this.hud.hang(null);
     this.trackView.reset(this.gen.track);
     this.cam.snap();
     this.hud.hideEnd();
@@ -124,15 +129,26 @@ export class Game {
         this.hud.callout(this.lines.pick(e.perfect ? "perfectPop" : "pop"), "", "pop");
         this.score.handle(e);
         break;
-      case "takeoff":
+      case "takeoff": {
         this.input.resetDrag();
         this.apexDone = false;
+        const landY = this.gen.track.nextJump(r.lipX)?.aim?.landY ?? r.y,
+          hang = (r.vy + Math.sqrt(Math.max(0, r.vy * r.vy + 2 * T.airGravity * (r.y - landY)))) / T.airGravity;
+        if (hang >= 1.3) {
+          this.hud.callout(this.lines.pick("send"), "", "pop");
+          this.hud.zoomBurst();
+          this.sound.play("whoosh");
+          this.cam.punch(5, 0.15);
+        }
         this.fx.clods(at, 10, V2.set(r.vx * 0.25, 2.5), 2.5, "#b06a35");
         this.fx.dust(at, 6, { size: 1.2, spread: 1.4, rise: 1, life: 1.1 });
         break;
+      }
       case "flip":
-        this.hud.callout(`${flipName(e.dir, e.total).toUpperCase()}!`, "", "trick");
+        this.hud.callout(`${flipName(e.dir, e.total).toUpperCase()}!`, "", e.total >= 2 ? "huge" : "trick");
         this.sound.play("trick", e.total);
+        this.cam.punch(2 + e.total * 2, 0.08);
+        this.fx.sparks(V.set(r.x, r.y + 1, 0.4), 10 * e.total, "#c6ff3d", 0.6);
         break;
       case "land": {
         const flowBefore = this.score.flow,
@@ -142,12 +158,16 @@ export class Game {
         this.fx.dust(at, Math.round(8 + 10 * k), { size: 1.4, spread: 2, rise: 0.8, life: 1.2 });
         this.fx.clods(at, 8, V2.set(r.v * 0.3, 2.5), 3, "#b06a35");
         if (e.grade === "perfect") {
-          this.hitstop = 0.07;
-          this.cam.punch(7, 0.25);
+          this.hitstop = 0.09;
+          this.cam.punch(9, 0.35);
           const up = at.clone().setY(at.y + 1);
-          this.fx.ring(up, 3.5, "#ffe7a0");
-          this.fx.flash(up, 4, "#fff3c0");
+          this.fx.ring(up, 5, "#ffe7a0", 0.5);
+          this.fx.ring(up, 3, "#c6ff3d", 0.35);
+          this.fx.flash(up, 5, "#fff3c0");
+          this.fx.sparks(up, 36);
+          this.hud.flash();
           this.sound.play("perfect");
+          if (res.points) this.sound.play("cheer");
         } else if (e.grade === "sketchy") {
           this.cam.punch(2, 0.35);
           this.sound.play("sketchy");
@@ -155,14 +175,29 @@ export class Game {
           this.cam.punch(3, 0.12);
           this.sound.play("land", k);
         }
-        const line = e.grade === "sketchy" ? this.lines.pick("sketchy") : res.points ? this.lines.pick(landKey(res.points)) : GRADE_LINES[e.grade];
+        const line =
+          e.grade === "sketchy" ? this.lines.pick(r.grab >= 0 || this.wasGrabbing ? "grab" : "sketchy") : res.points ? this.lines.pick(landKey(res.points)) : GRADE_LINES[e.grade];
         this.hud.landing(res, line);
+        if (res.points) {
+          const sp = this.screen(r.x, r.y + 1.6);
+          this.hud.floater(`+${res.points.toLocaleString("en-US")}${res.multiplier > 1 ? ` ×${res.multiplier}` : ""}`, sp.x, sp.y, res.points >= 5000);
+        }
+        if (res.points >= 5000) {
+          this.sound.play("airhorn");
+          this.fx.confetti(at.clone().setY(at.y + 1), 60);
+          this.hud.pulse("#ffd23a");
+          this.hud.flash("#ffe9a8");
+        }
         if (res.tricks.length && res.name !== res.tricks.join(" + ")) this.sound.play("reel");
         if (res.flowChange > 0) {
           if (this.score.flow === T.flowMax && flowBefore < T.flowMax) {
             this.hud.banner(this.lines.pick("onFire"));
+            this.hud.pulse("#ff6a2e");
             this.sound.play("onFire");
-          } else this.sound.play("flowUp");
+          } else {
+            this.hud.pulse("#c6ff3d");
+            this.sound.play("flowUp");
+          }
         }
         break;
       }
@@ -172,8 +207,10 @@ export class Game {
         this.riderView.yardSale({ vx: r.vx, vy: r.vy }, this.stage.scene, Math.sign(r.vx) || 1);
         this.fx.dust(at, 18, { size: 2, spread: 2.5, rise: 1, life: 1.6 });
         this.fx.clods(at, 24, V2.set(r.vx * 0.3, 4), 4, "#b06a35");
-        this.cam.punch(9, 0.6);
+        this.cam.punch(12, 0.8);
+        this.hud.flash("#ff4fa3");
         this.sound.play("bail");
+        this.sound.play("slam");
         this.bailClock = 0;
         break;
       case "stalled":
@@ -181,6 +218,13 @@ export class Game {
         this.endRun("stalled", this.lines.pick("stalled"));
         break;
     }
+  }
+  /** Test hook: wipe out right now (smoke tests use it to capture the yard sale). */
+  crash() {
+    if (this.rider.state !== "riding" && this.rider.state !== "air") return;
+    if (this.rider.state === "riding") Object.assign(this.rider, { vx: this.rider.v, vy: 3 });
+    this.rider.state = "bailed";
+    this.handle({ type: "bail", reason: "sideways" });
   }
   private endRun(reason: BailReason | "stalled", title: string) {
     if (this.ended) return;
@@ -236,13 +280,22 @@ export class Game {
       perfect: T.perfectPopWindow,
     });
   }
+  /** World point → CSS pixels. */
+  private screen(x: number, y: number) {
+    const p = new THREE.Vector3(x, y, 0).project(this.stage.camera),
+      rect = this.stage.renderer.domElement.getBoundingClientRect();
+    return { x: rect.left + ((p.x + 1) * rect.width) / 2, y: rect.top + ((1 - p.y) * rect.height) / 2 };
+  }
   /** Big airs get a beat of slow motion at the top of the arc. */
   private checkApex(r: Rider, track: Track) {
     if (r.state !== "air" || this.apexDone || r.vy > 0) return;
     this.apexDone = true;
     const landY = track.nextJump(r.lipX)?.aim?.landY ?? track.heightAt(r.x + 5),
       fall = Math.sqrt(Math.max(0, (2 * (r.y - landY)) / T.airGravity));
-    if (r.airTime + fall >= T.slowmoAir) this.slowmo = 0.35;
+    if (r.airTime + fall >= T.slowmoAir) {
+      this.slowmo = 0.4;
+      this.cam.punch(-6, 0);
+    }
   }
   private frame(now: number) {
     requestAnimationFrame((t) => this.frame(t));
@@ -262,6 +315,7 @@ export class Game {
       this.prev = { x: r.x, y: r.y, pitch: r.pitch };
       r.flow = this.score.flow;
       const actions = this.autopilot === "tricks" ? stuntActions(r, track) : this.autopilot ? botActions(r, track) : this.input.actions();
+      this.wasGrabbing = r.grabBlend > 0;
       for (const e of step(r, actions, track, dt)) this.handle(e);
       if (r.state === "riding" || r.state === "air") this.score.tick(dt, r.state === "riding", r.distance);
       this.acc -= dt;
@@ -289,6 +343,8 @@ export class Game {
         elapsed,
       );
     this.emit(elapsed, r, x, y, pitch);
+    this.trail.update(V.set(x - 0.2 * Math.cos(pitch), y + 0.9, -0.1), r.state === "air" && !this.riderView.yard, this.score.flow >= T.flowMax, elapsed);
+    this.hud.hang(r.state === "air" && r.airTime > 0.9 ? r.airTime : null);
     this.fx.update(elapsed, (gx) => track.heightAt(gx));
     this.trackView.update(x);
     this.cam.update(x, y, track.heightAt(x), speed, real, innerHeight > innerWidth);

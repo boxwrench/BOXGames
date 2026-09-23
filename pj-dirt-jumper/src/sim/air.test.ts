@@ -37,7 +37,7 @@ test("crossing a lip launches along the lip angle", () => {
   assert.equal(r.state, "air");
   assert.ok(events.some((e) => e.type === "takeoff"));
   assert.equal(r.x, 20);
-  assert.ok(Math.abs(r.vy / r.vx - 0.7) < 0.01, `ratio ${r.vy / r.vx}`);
+  assert.ok(Math.abs(r.vy - r.vx * 0.7 - T.autoPop) < 0.05, `lift ${r.vy - r.vx * 0.7}`);
 });
 test("releasing pump in the perfect window pops hard", () => {
   const t = kicker(),
@@ -51,7 +51,7 @@ test("releasing before the window does nothing", () => {
     r = riding(15, 12),
     events = run(r, t, (r) => ({ ...NO_ACTIONS, pump: 20 - r.x > 6 }), 2, (r) => r.state === "air");
   assert.ok(!events.some((e) => e.type === "pop"));
-  assert.ok(Math.abs(r.vy / r.vx - 0.7) < 0.01);
+  assert.ok(Math.abs(r.vy - r.vx * 0.7 - T.autoPop) < 0.05, "only the automatic pop");
 });
 test("the pop window is measured in time, so it is as wide at speed", () => {
   const t = kicker(),
@@ -69,7 +69,7 @@ test("letting go just after leaving the lip still pops", () => {
     late = run(r, t, () => NO_ACTIONS, 0.02);
   assert.equal(held.length, 0);
   assert.deepEqual(late[0], { type: "pop", perfect: false });
-  assert.ok(r.vy > vy - T.airGravity * 0.08 + T.popBoost - 0.2, `vy ${r.vy} from ${vy}`);
+  assert.ok(r.vy > vy - T.airGravity * 0.08 + T.popBoost - T.autoPop - 0.2, `vy ${r.vy} from ${vy}`);
 });
 test("the late-pop grace runs out", () => {
   const t = kicker(),
@@ -132,21 +132,27 @@ test("landing grades follow the angle error, and PERFECT needs a downslope", () 
   assert.ok(Math.abs(perfect.r.v - 13) < 0.2);
   assert.equal((touchdown(0, 0).land as { grade: string } | undefined)?.grade, "buttery");
   const grade = (o: number) => (touchdown(-0.5, o * deg).land as { grade: string } | undefined)?.grade;
-  assert.equal(grade(12), "buttery");
-  assert.equal(grade(20), "clean");
-  assert.equal(grade(32), "sketchy");
-  const sketchy = touchdown(-0.5, 32 * deg);
+  assert.equal(grade(17), "buttery");
+  assert.equal(grade(28), "clean");
+  assert.equal(grade(45), "sketchy");
+  const sketchy = touchdown(-0.5, 45 * deg);
   assert.equal(sketchy.r.wobble, T.wobbleSeconds);
   assert.ok(Math.abs(sketchy.r.v - 7) < 0.2);
   assert.equal(sketchy.r.state, "riding");
 });
-test("bails: sideways, still grabbing, huck to flat, casing an upslope", () => {
-  assert.deepEqual(touchdown(-0.5, 50 * deg).bail, { type: "bail", reason: "sideways" });
-  assert.deepEqual(touchdown(-0.5, 0, { grabBlend: 0.5 }, { ...NO_ACTIONS, grab: [true, false, false] }).bail, { type: "bail", reason: "grab" });
-  assert.deepEqual(touchdown(0, 0, { vx: 8, vy: -14 }).bail, { type: "bail", reason: "huck" });
+test("bails: sideways, huck to flat, casing an upslope", () => {
+  assert.deepEqual(touchdown(-0.5, 70 * deg).bail, { type: "bail", reason: "sideways" });
+  assert.deepEqual(touchdown(0, 0, { vx: 8, vy: -20 }).bail, { type: "bail", reason: "huck" });
   const up = Math.atan(0.3);
-  assert.deepEqual(touchdown(0.3, 0, { vx: 8, vy: -12, pitch: up }).bail, { type: "bail", reason: "cased" });
-  assert.equal(touchdown(0, 0, { vx: 8, vy: -14 }).r.state, "bailed");
+  assert.deepEqual(touchdown(0.3, 0, { vx: 8, vy: -19, pitch: up }).bail, { type: "bail", reason: "cased" });
+  assert.equal(touchdown(0, 0, { vx: 8, vy: -20 }).r.state, "bailed");
+});
+test("forgiving: a hard-ish flat landing or one still mid-grab is only sketchy", () => {
+  assert.equal(touchdown(0, 0, { vx: 8, vy: -14 }).r.state, "riding");
+  const grabbing = touchdown(-0.5, 0, { grabBlend: 0.5 }, { ...NO_ACTIONS, grab: [true, false, false] });
+  assert.equal(grabbing.bail, undefined);
+  assert.equal((grabbing.land as { grade: string } | undefined)?.grade, "sketchy");
+  assert.equal(grabbing.r.grabBlend, 0);
 });
 test("landing reports the air's tricks", () => {
   const { land } = touchdown(-0.5, 0, { flips: 1, spun: TAU, grabTime: [0.5, 0, 0.1] });

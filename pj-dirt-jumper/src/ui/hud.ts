@@ -29,6 +29,11 @@ export class Hud {
     this.el.className = "hud";
     this.el.innerHTML = `
       <div class="speedlines" data-speedlines></div>
+      <div class="zoomlines" data-zoom></div>
+      <div class="edge" data-edge></div>
+      <div class="flash" data-flash></div>
+      <div class="floaters" data-floaters></div>
+      <div class="hang" data-hang></div>
       <div class="stats"><div><b data-speed>0</b><span>KM/H</span></div><div><b data-dist>0</b><span>M</span></div></div>
       <div class="topright"><div class="score"><b data-score>0</b><span>SCORE</span><small data-best></small></div><button class="mute" data-mute aria-label="Toggle sound">🔊</button></div>
       <div class="flow" data-flow aria-label="Flow"><span>FLOW</span><i></i><i></i><i></i><i></i><i></i><b>ON FIRE</b></div>
@@ -131,6 +136,43 @@ export class Hud {
     el.style.top = `${cue.sy}px`;
     el.style.setProperty("--k", String(1 + Math.max(0, cue.t - cue.perfect) * 2.2));
     el.querySelector("b")!.textContent = inWindow ? "LET GO!" : cue.loaded ? "READY…" : "HOLD";
+  }
+  private replay(el: HTMLElement, cls: string) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+  /** Full-screen flash (PERFECT, huge scores, crashes). */
+  flash(color = "#fff6d8") {
+    const el = $(this.el, "[data-flash]");
+    el.style.background = color;
+    this.replay(el, "go");
+  }
+  /** Coloured glow pulsing in from the screen edges (Flow up, ON FIRE). */
+  pulse(color: string) {
+    const el = $(this.el, "[data-edge]");
+    el.style.setProperty("--c", color);
+    this.replay(el, "go");
+  }
+  /** Radial zoom lines bursting from the centre (SEND IT takeoffs). */
+  zoomBurst() {
+    this.replay($(this.el, "[data-zoom]"), "go");
+  }
+  /** Points that pop out of PJ and fly up toward the score. */
+  floater(text: string, sx: number, sy: number, big: boolean) {
+    const el = document.createElement("div");
+    el.className = `floater${big ? " big" : ""}`;
+    el.textContent = text;
+    el.style.left = `${sx}px`;
+    el.style.top = `${sy}px`;
+    $(this.el, "[data-floaters]").append(el);
+    setTimeout(() => el.remove(), 1300);
+  }
+  /** HANG TIME counter while PJ is up there (null hides it). */
+  hang(seconds: number | null) {
+    const el = $(this.el, "[data-hang]");
+    el.classList.toggle("show", seconds !== null);
+    if (seconds !== null) el.textContent = `HANG TIME ${seconds.toFixed(1)}s`;
   }
   setMuted(muted: boolean) {
     $(this.el, "[data-mute]").textContent = muted ? "🔇" : "🔊";

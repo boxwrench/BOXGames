@@ -4,12 +4,15 @@ export class CameraRig {
   private pos = new THREE.Vector3();
   private look = new THREE.Vector3();
   private snapNext = true;
+  /** Multiplies the follow distance; `?closeup` sets it small for inspecting PJ. */
+  zoom = 1;
   private kick = 0;
   private shake = 0;
   constructor(private camera: THREE.PerspectiveCamera) {}
   /** FOV kick (degrees) and screen shake (metres) that decay quickly — landings, bails. */
   punch(fov: number, shake: number) {
-    this.kick = Math.max(this.kick, fov);
+    // Negative FOV kicks zoom in (apex slow-mo); they override a smaller kick either way.
+    this.kick = Math.abs(fov) > Math.abs(this.kick) ? fov : this.kick;
     this.shake = Math.max(this.shake, shake);
   }
   snap() {
@@ -19,10 +22,11 @@ export class CameraRig {
     // Narrow portrait screens can't afford much look-ahead or PJ slides off the left edge.
     const air = Math.max(0, y - groundY),
       ahead = portrait ? 0.5 + speed * 0.12 : 3 + speed * 0.45,
-      back = (portrait ? 22 : 9.5) + speed * 0.25 + Math.min(10, air * 0.9),
+      back = ((portrait ? 22 : 9.5) + speed * 0.25 + Math.min(10, air * 0.9)) * this.zoom,
       midY = groundY + (y - groundY) * 0.6,
-      look = new THREE.Vector3(x + ahead, midY + 2.5, 0),
-      pos = new THREE.Vector3(x + ahead * 0.8, midY + 3 + speed * 0.05, back);
+      z = this.zoom,
+      look = new THREE.Vector3(x + ahead * z, midY + 2.5 * z + (1 - z) * 1.3, 0),
+      pos = new THREE.Vector3(x + ahead * 0.8 * z, midY + (3 + speed * 0.05) * z + (1 - z) * 1.5, back);
     if (this.snapNext) {
       this.pos.copy(pos);
       this.look.copy(look);

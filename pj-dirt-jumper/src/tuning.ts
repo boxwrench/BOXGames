@@ -20,23 +20,24 @@ export const T = {
   perfectPopWindow: 0.1, // s before the lip for a perfect pop
   latePop: 0.12, // s after leaving the lip in which letting go still pops (normal strength)
   popBoost: 3,
+  autoPop: 2, // m/s of lift every lip gives even without a manual pop (easy air)
   perfectPopBonus: 1.2,
   minLaunchSpeed: 3,
   // Air (spec §5.4)
   spinRate: 420 * deg,
   spinResponse: 8,
-  assistRate: 2.2, // rad/s the bike eases toward its flight path with no spin input
+  assistRate: 4.5, // rad/s the bike eases toward its flight path with no spin input
   flipTolerance: 20 * deg,
   grabBlend: 0.15,
   grabMin: 0.25,
   // Landing (spec §5.5)
-  landPerfect: 8 * deg,
-  landButtery: 15 * deg,
-  landClean: 25 * deg,
-  landSketchy: 40 * deg,
+  landPerfect: 12 * deg,
+  landButtery: 22 * deg,
+  landClean: 35 * deg,
+  landSketchy: 60 * deg,
   downslope: -3 * deg,
   upslope: 3 * deg,
-  huckImpact: 12,
+  huckImpact: 18,
   landSpeed: { perfect: 3, buttery: 1.5, clean: 0, sketchy: -3 },
   wobbleSeconds: 0.5,
   // Track design
