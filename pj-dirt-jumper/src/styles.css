@@ -173,3 +173,28 @@
 .nowplaying i{font-style:normal;color:var(--lime)}.nowplaying b{font-weight:900}.nowplaying span{opacity:.75}
 .nowplaying.go{animation:nowplaying 5s ease-out forwards}
 @keyframes nowplaying{0%{opacity:0;transform:translateX(-12px)}6%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0}}
+
+/* Mobile fixes (scripts/mobile.mjs): the results card sits above in-run callouts; short landscape screens get a compact
+   title and results card; the now-playing tag clears the Flow meter on narrow portrait screens. */
+.end{z-index:4}
+.tagline{margin-top:20px}
+.hud:has(.end:not(.hidden)) :is(.tip,.ticker,.banner,.callout,.warn,.popcue,.hang){visibility:hidden}
+@media (orientation:portrait) and (max-width:430px){.tagline{font-size:13px;letter-spacing:3px}}
+@media (orientation:landscape) and (max-height:500px){
+  .titlescreen{gap:6px;padding:10px}
+  .logo b{font-size:min(10vw,16vh)}
+  .logo .pj{font-size:min(4vw,6.5vh)}
+  .logo i{font-size:min(6vw,10vh)}
+  .tagline{margin-top:16px;font-size:14px}
+  .titlescreen .go{min-height:52px;padding:8px 36px;font-size:24px}
+  .t-controls{display:none}
+  .end{gap:4px;padding:10px}
+  .end h1{font-size:min(44px,11vh)}
+  .end .newbest{font-size:15px}
+  .end p{margin:0 0 4px;font-size:13px}
+  .results{margin:4px 0 2px}
+  .end button{min-height:48px;padding:8px 24px;font-size:16px}
+  .end .menu{min-height:40px;margin-top:2px}
+}
+@media (orientation:portrait){.nowplaying{top:calc(max(12px,env(safe-area-inset-top)) + 128px);max-width:calc(100vw - 32px)}}
+.nowplaying b,.nowplaying span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}

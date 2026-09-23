@@ -114,6 +114,7 @@ export class Sound {
       this.buzz = { osc, gain: bg };
     }
     void this.ctx.resume();
+    this.primeSpeech();
     this.startMusic();
   }
   toggle() {
@@ -296,6 +297,19 @@ export class Sound {
     }
   }
   private spokeAt = 0;
+  private primed = false;
+  /** iOS only lets speech play after something has been spoken inside a tap: say nothing, silently, on the first one. */
+  private primeSpeech() {
+    if (this.primed || typeof speechSynthesis === "undefined") return;
+    this.primed = true;
+    try {
+      const u = new SpeechSynthesisUtterance(" ");
+      u.volume = 0;
+      speechSynthesis.speak(u);
+    } catch {
+      // No speech on this device: speech bubbles still carry every line.
+    }
+  }
   private cast?: Cast<SpeechSynthesisVoice>;
   /** The device's voices load late in some browsers; recast whenever the list changes. */
   private castFor() {

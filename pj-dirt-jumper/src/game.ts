@@ -20,6 +20,7 @@ import { storage } from "./storage";
 import { Director, OMENS, type OmenKind } from "./weird/director";
 import { Omens } from "./weird/omens";
 import { PikeminnowRocket } from "./weird/rocket";
+import { Quality } from "./render/quality";
 import { dropPoint, dropRider } from "./sim/slipstream";
 import { T } from "./tuning";
 import { wadeQuote } from "./wade";
@@ -51,6 +52,8 @@ export class Game {
   director = new Director(0);
   readonly omens: Omens;
   readonly rocket: PikeminnowRocket;
+  /** Lowers the render resolution on devices that can't keep up. */
+  private quality = new Quality(Math.min(devicePixelRatio, 2));
   /** When the rocket last came, and where the tow started (distance keeps counting through the slipstream). */
   private rocketAt = -99;
   private towFrom = { x: 0, distance: 0 };
@@ -121,7 +124,8 @@ export class Game {
     this.sound.onSong = (s) => this.hud.nowPlaying(s.title, s.band);
     this.hud.onMenu = () => this.toTitle();
     const unlock = () => this.sound.unlock();
-    addEventListener("pointerdown", unlock);
+    // iOS Safari only unlocks audio (and speech) from a finger lift, so listen for those too.
+    for (const type of ["pointerdown", "touchend", "click"]) addEventListener(type, unlock);
     addEventListener("resize", () => this.stage.resize());
     addEventListener("keydown", (e) => {
       unlock();
@@ -148,6 +152,7 @@ export class Game {
     this.omensSeen = 0;
     this.omens.clear();
     this.rocket.stop();
+    this.towWarp = 0;
     this.rocketAt = -99;
     this.prev = { x: this.rider.x, y: this.rider.y, pitch: this.rider.pitch };
     this.acc = 0;
@@ -388,6 +393,8 @@ export class Game {
   /** Test hook: wipe out right now (smoke tests use it to capture the yard sale). */
   crash() {
     if (this.rider.state !== "riding" && this.rider.state !== "air") return;
+    this.rocket.stop();
+    this.towWarp = 0;
     if (this.rider.state === "riding") Object.assign(this.rider, { vx: this.rider.v, vy: 3 });
     this.rider.state = "bailed";
     this.handle({ type: "bail", reason: "sideways" });
@@ -626,6 +633,11 @@ export class Game {
         this.hud.callout(this.bailLine, "", "bad");
       }
       if (this.bailClock > 1.9) this.endRun(this.bailReason, this.bailLine);
+    }
+    if (this.quality.frame(real)) {
+      this.stage.renderer.setPixelRatio(this.quality.ratio);
+      this.stage.sun.castShadow = this.quality.shadows;
+      this.stage.resize();
     }
     this.stage.renderer.render(this.stage.scene, this.stage.camera);
   }

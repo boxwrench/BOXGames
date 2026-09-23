@@ -4,7 +4,7 @@
 
 Endless side-on arcade dirt jumping. PJ — a sendy teen who'd rather be fishing — pumps, pops and flips down a seeded trail. Stunts give speed; speed gives bigger stunts.
 
-**Status:** Milestone 3 — attitude: scoring, fishing-named combos, Flow meter, slang callouts, particles, slow-mo, yard-sale crashes, golden-hour art and a synth soundtrack: a rotating setlist (skate punk, surf, ska, chiptune, d-beat, sludge; synthwave in the rocket's slipstream), each song in its own key with intro, verses, choruses and a breakdown, layering up with Flow. Press **N** for the next song (`src/audio/music.ts`). Design: [docs/specs](docs/specs/2026-09-22-pj-dirt-jumper-design.md).
+**Status:** Milestone 3 — attitude: scoring, fishing-named combos, Flow meter, slang callouts, particles, slow-mo, yard-sale crashes, golden-hour art and a synth soundtrack: a rotating setlist (skate punk, surf, ska, chiptune, d-beat, sludge; synthwave in the rocket's slipstream), each song in its own key with intro, verses, choruses and a breakdown, layering up with Flow. Press **N** for the next song (`src/audio/music.ts`). Levels are matched per style (`node --import tsx scripts/loudness.mjs`) with a leveler on the music bus. Design: [docs/specs](docs/specs/2026-09-22-pj-dirt-jumper-design.md).
 
 ## Run
 
@@ -37,3 +37,11 @@ Going further pays. Milestones at 300, 600, 1,000, 1,500, 2,000, 2,600, 3,300, 4
 Distance plus air points: trick base (flip 500 / double 1,200 / triple 2,000, grabs 60 per 0.1 s, perfect pop +150) × number of different tricks × Flow (1 + 0.5 per level) × landing (Perfect 1.5, Buttery 1.2). Sketchy landings bank half. Landing any trick kicks in +1.5 m/s, and pumping the flats claws back 60 % of rolling losses (a little help, never a free ride). Perfect/Buttery landings fill Flow; at 5 you're ON FIRE. Named combos: Bluegill Backflip, Largemouth Tailwhip, The Double Hookset, Lunker Loop, Full Tackle Box, Catch-and-Release.
 
 `?seed=123` rides a specific trail; the default is today's Daily Line.
+
+## Mobile
+
+`node scripts/mobile.mjs` (dev server running) drives emulated phones and a tablet in portrait and landscape with real
+touch events: title and results fit on screen, SEND IT / SEND IT AGAIN taps work, the pump pad, drag-to-flip and grab
+buttons respond, HUD controls don't overlap. Slow devices step the render resolution down automatically, then drop
+shadows (`src/render/quality.ts`). Audio and speech unlock on the first tap, including iOS Safari.
+
