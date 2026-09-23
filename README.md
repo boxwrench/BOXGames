@@ -20,7 +20,7 @@ and needs no root. See [docs/SETUP.md](docs/SETUP.md) if it fails.
 | Game | Description | Status |
 | --- | --- | --- |
 | [noise-floor](games/noise-floor/) | Survivors-like. BX-77 holds a Citadel deck while entropy eats the page out from under him. | Scaffold |
-| [pj-dirt-jumper](pj-dirt-jumper/) | Web (Vite + three.js). Endless arcade dirt-jump/pump-track with PJ, a sendy teen angler. | Milestone 1 |
+| [pj-dirt-jumper](pj-dirt-jumper/) | Web (Vite + three.js). Endless arcade dirt-jump/pump-track with PJ, a sendy teen angler. | Milestone 2 |
 
 ## Layout
 

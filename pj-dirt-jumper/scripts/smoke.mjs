@@ -18,23 +18,27 @@ for (const [name, viewport] of [["desktop", { width: 1440, height: 900 }], ["pho
   const page = await browser.newPage({ viewport, hasTouch: name !== "desktop" });
   page.on("pageerror", (e) => problems.push(`${name}: ${e.message}`));
   page.on("console", (m) => m.type() === "error" && problems.push(`${name}: ${m.text()}`));
-  await page.goto(url);
+  await page.goto(url + (url.includes("?") ? "&" : "?") + "autopilot=1");
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `smoke-out/${name}-start.png` });
-  // Bot: hold pump on downslopes for 8 s of wall time.
-  const until = Date.now() + 8000;
-  let held = false;
+  // Let the reference bot ride; grab a screenshot the first time PJ is airborne.
+  let airShot = false;
+  const until = Date.now() + 14000;
   while (Date.now() < until) {
-    const down = await page.evaluate(() => window.game.gen.track.slopeAt(window.game.rider.x) < 0);
-    if (down !== held) await (down ? page.keyboard.down("Space") : page.keyboard.up("Space"));
-    held = down;
-    await page.waitForTimeout(30);
+    const air = await page.evaluate(() => window.game.rider.state === "air");
+    if (air && !airShot) {
+      await page.waitForTimeout(700); // mid-flight, so the arc and landing are in frame
+      await page.screenshot({ path: `smoke-out/${name}-air.png` });
+      airShot = true;
+    }
+    await page.waitForTimeout(40);
   }
-  await page.keyboard.up("Space");
   await page.screenshot({ path: `smoke-out/${name}-riding.png` });
-  const state = await page.evaluate(() => ({ x: Math.round(window.game.rider.x), v: +window.game.rider.v.toFixed(1), state: window.game.rider.state }));
+  const state = await page.evaluate(() => ({ x: Math.round(window.game.rider.x), state: window.game.rider.state, log: window.game.log.filter((t) => t !== "flip").slice(-8) }));
   console.log(name, state);
   if (state.x < 30) problems.push(`${name}: rider barely moved (${state.x} m)`);
+  if (state.log.includes("bail") || state.state === "bailed") problems.push(`${name}: autopilot bailed`);
+  if (!airShot) problems.push(`${name}: never got air`);
   await page.close();
 }
 await browser.close();
