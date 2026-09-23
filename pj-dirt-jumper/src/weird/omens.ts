@@ -116,7 +116,7 @@ export class Omens {
   }
   /** A giant red-and-white bobber rises as the moon, its line running up out of the sky. */
   private bobberMoon(dur: number) {
-    this.stage.sound.speak("The moon is a bobber now. Do not think about it.", 0.6, 0.9);
+    this.stage.sound.speak("The moon is a bobber now. Do not think about it.", "omen");
     const g = new THREE.Group(),
       top = new THREE.Mesh(new THREE.SphereGeometry(14, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: "#ff3b2f", fog: false })),
       bottom = new THREE.Mesh(new THREE.SphereGeometry(14, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshBasicMaterial({ color: "#fff4e8", fog: false })),
@@ -151,11 +151,11 @@ export class Omens {
   /** Dad Bluegill drops in with a word of advice, in his dad voice. */
   dad(line: string, seconds = 5 + line.length / 18) {
     this.stage.hud.bluegill(this.bluegill, line, seconds);
-    this.stage.sound.speak(line, 0.7, 0.85);
+    this.stage.sound.speak(line, "dad");
   }
   /** Fish fall from the sky around PJ; any PJ touches is caught. */
   private fishRain(dur: number) {
-    this.stage.sound.speak("It is raining bait. Open your mouth.", 1.3, 1.1);
+    this.stage.sound.speak("It is raining bait. Open your mouth.", "hype");
     const fish: Faller[] = [];
     let clock = 0;
     this.stage.sound.play("bubbles");
@@ -209,7 +209,7 @@ export class Omens {
     return t;
   })();
   private landTrout(dur: number) {
-    this.stage.sound.speak("Land trout sighted. Stay calm.", 0.8, 0.95);
+    this.stage.sound.speak("Land trout sighted. Stay calm.", "omen");
     const fish = new THREE.Mesh(
       new THREE.PlaneGeometry(130, 81),
       new THREE.MeshBasicMaterial({ map: this.trout, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide, toneMapped: false }),
@@ -268,9 +268,9 @@ export class Omens {
     setTimeout(strike, 180);
     this.stage.sound.play("choir");
     if (son) {
-      this.stage.sound.speak("This is my son. He is also a bass.", 0.1, 0.7);
-      setTimeout(() => this.stage.sound.speak("Hi. I'm Kevin.", 2, 1.2), 3200);
-    } else this.stage.sound.speak("Behold. The bass god is pleased.", 0.1, 0.7);
+      this.stage.sound.speak("This is my son. He is also a bass.", "god");
+      setTimeout(() => this.stage.sound.speak("Hi. I'm Kevin.", "kid"), 3200);
+    } else this.stage.sound.speak("Behold. The bass god is pleased.", "god");
     return this.run(
       son ? "bassSon" : "bassGod",
       dur,
@@ -298,7 +298,7 @@ export class Omens {
   }
   /** The sky floods: a water sky, rising bubbles, giant fish drifting overhead. */
   private lakeSky(dur: number) {
-    this.stage.sound.speak("The sky is a lake. Breathe normally.", 0.9, 0.85);
+    this.stage.sound.speak("The sky is a lake. Breathe normally.", "omen");
     const scene = this.stage.scene,
       oldBg = scene.background,
       fog = scene.fog as THREE.Fog,
@@ -350,7 +350,7 @@ export class Omens {
   }
   /** A giant hook and wriggling worm lower from the heavens ahead of PJ, then yank away. */
   private giantHook(dur: number) {
-    this.stage.sound.speak("Do not take the bait.", 0.3, 0.75);
+    this.stage.sound.speak("Do not take the bait.", "god");
     const steel = new THREE.MeshStandardMaterial({ color: "#c9d2dc", metalness: 0.85, roughness: 0.25 }),
       curve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(0, 6, 0),
@@ -393,7 +393,7 @@ export class Omens {
   }
   /** Giant lures drift across the sky; low ones cross PJ's path and can be snagged for points. */
   private tackleBox(dur: number) {
-    this.stage.sound.speak("The tackle box is open. The lures are free.", 0.8, 0.9);
+    this.stage.sound.speak("The tackle box is open. The lures are free.", "omen");
     this.stage.sound.play("reel");
     const lures: { s: THREE.Sprite; v: THREE.Vector2; spin: number; low: boolean; live: boolean }[] = [];
     let clock = 0;
@@ -445,7 +445,7 @@ export class Omens {
   }
   /** The ground wriggles: worms burst out along the trail, then float up into golden beams. */
   private wormRapture(dur: number) {
-    this.stage.sound.speak("The worms are ascending. Do not follow them.", 0.5, 0.8);
+    this.stage.sound.speak("The worms are ascending. Do not follow them.", "omen");
     this.stage.sound.play("thunder");
     const SEG = 9,
       COUNT = 40,

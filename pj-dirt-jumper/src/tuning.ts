@@ -74,4 +74,5 @@ export const T = {
   rocketMeters: 160, // at least this far down the trail
   rocketDropPast: 2, // m past the landing's sweet spot where PJ touches down
   rocketPoints: 2500,
+  wadeScore: 200_000, // runs scoring this much end with a word from Jeremy Wade
 } as const;

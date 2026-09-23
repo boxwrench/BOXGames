@@ -22,6 +22,8 @@ import { Omens } from "./weird/omens";
 import { PikeminnowRocket } from "./weird/rocket";
 import { dropPoint, dropRider } from "./sim/slipstream";
 import { T } from "./tuning";
+import { wadeQuote } from "./wade";
+import wadePhoto from "./assets/wade.webp";
 const TIPS: Record<BailReason | "stalled", string> = {
   stalled: "Pump the downslopes to keep your speed.",
   cased: "Too short. Pump harder and pop the lip.",
@@ -223,7 +225,7 @@ export class Game {
         this.hud.landing(res, line);
         this.perfectStreak = e.grade === "perfect" ? this.perfectStreak + 1 : 0;
         if (this.perfectStreak >= 3) this.hud.banner(this.lines.pick("streak", this.depth, { n: this.perfectStreak }));
-        if (res.points >= 5000 && !(this.dadMet && Math.random() < 0.35 && this.dad("dadHype"))) this.sound.speak(line, 1.1, 1.05, 8);
+        if (res.points >= 5000 && !(this.dadMet && Math.random() < 0.35 && this.dad("dadHype"))) this.sound.speak(line, "hype", 8);
         if (res.points) {
           const sp = this.screen(r.x, r.y + 1.6);
           this.hud.floater(`+${res.points.toLocaleString("en-US")}${res.multiplier > 1 ? ` ×${res.multiplier}` : ""}`, sp.x, sp.y, res.points >= 5000);
@@ -239,7 +241,7 @@ export class Game {
           if (this.score.flow === T.flowMax && flowBefore < T.flowMax) {
             const fire = this.lines.pick("onFire", this.depth);
             this.hud.banner(fire);
-            this.sound.speak(fire, 1.2, 1.1, 6);
+            this.sound.speak(fire, "hype", 6);
             this.hud.pulse("#ff6a2e");
             this.sound.play("onFire");
           } else {
@@ -252,7 +254,7 @@ export class Game {
       case "bail":
         this.bailReason = e.reason;
         this.bailLine = this.lines.pick(e.reason, this.depth);
-        this.sound.speak(this.bailLine, 0.9, 1);
+        this.sound.speak(this.bailLine, "hype");
         this.perfectStreak = 0;
         this.riderView.yardSale({ vx: r.vx, vy: r.vy }, this.stage.scene, Math.sign(r.vx) || 1);
         this.fx.dust(at, 18, { size: 2, spread: 2.5, rise: 1, life: 1.6 });
@@ -325,7 +327,7 @@ export class Game {
     this.hud.callout(this.lines.pick("rocket", this.depth), "Pikeminnow Rocket", "huge");
     this.sound.play("rocket");
     this.sound.play("whoosh");
-    this.sound.speak("Pikeminnow rocket! Hold on!", 1.2, 1.15);
+    this.sound.speak("Pikeminnow rocket! Hold on!", "hype");
   }
   /** PJ is being towed: the rocket owns PJ's position until touchdown, then the sim takes over again. */
   private tow(r: Rider, dt: number, track: Track) {
@@ -364,6 +366,16 @@ export class Game {
     this.sound.play("cheer");
   }
   private towWarp = 0;
+  /** A run over T.wadeScore earns a word from Jeremy Wade: the next of his quotes, in his (British) voice. */
+  showWade() {
+    const n = Number(storage("pj-wade")) || 0,
+      q = wadeQuote(n);
+    storage("pj-wade", String(n + 1));
+    this.hud.wade(wadePhoto, q.text, q.book, 16);
+    this.sound.play("depth");
+    const run = this.director;
+    setTimeout(() => this.director === run && this.ended && this.sound.speak(q.text, "wade"), 1200);
+  }
   /** Test hook: summon an omen now (art review, smoke tests). */
   summon(kind: OmenKind) {
     const o = OMENS.find((x) => x.kind === kind)!;
@@ -415,7 +427,8 @@ export class Game {
       depth: this.director.depth,
       omens: this.omensSeen,
     });
-    if (this.dadMet && reason !== "stalled") {
+    if (total >= T.wadeScore) this.showWade();
+    else if (this.dadMet && reason !== "stalled") {
       this.dadAt = -99;
       this.dad("dadBail");
     }

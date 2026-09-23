@@ -1,4 +1,5 @@
 import { storage } from "../storage";
+import { DELIVERY, castVoices, type Cast, type Speaker } from "./voices";
 export type Cue = "pop" | "perfectPop" | "land" | "perfect" | "sketchy" | "trick" | "reel" | "bail" | "flowUp" | "onFire" | "stall" | "best" | "airhorn" | "cheer" | "whoosh" | "slam" | "thunder" | "choir" | "splash" | "bubbles" | "depth" | "rocket" | "warp";
 interface Voice {
   type?: OscillatorType;
@@ -269,19 +270,36 @@ export class Sound {
     }
   }
   private spokeAt = 0;
+  private cast?: Cast<SpeechSynthesisVoice>;
+  /** The device's voices load late in some browsers; recast whenever the list changes. */
+  private castFor() {
+    if (!this.cast) {
+      const recast = () => (this.cast = castVoices(speechSynthesis.getVoices()));
+      recast();
+      speechSynthesis.addEventListener?.("voiceschanged", recast);
+    }
+    return this.cast!;
+  }
   /**
-   * Spoken lines through the browser's speech synthesis, if it has a voice (and the game isn't muted). `gap` skips
-   * the line if anything was said in the last `gap` seconds, so commentary never piles up.
+   * Spoken lines through the browser's speech synthesis, if it has a voice (and the game isn't muted), in the
+   * speaker's own voice. `gap` skips the line if anything was said in the last `gap` seconds, so commentary never
+   * piles up.
    */
-  speak(text: string, pitch = 1, rate = 1, gap = 0) {
+  speak(text: string, speaker: Speaker, gap = 0) {
     if (this.muted || typeof speechSynthesis === "undefined") return;
     const now = performance.now() / 1000;
     if (gap && now - this.spokeAt < gap) return;
     this.spokeAt = now;
     try {
-      const u = new SpeechSynthesisUtterance(sayable(text));
-      u.pitch = pitch;
-      u.rate = rate;
+      const u = new SpeechSynthesisUtterance(sayable(text)),
+        how = DELIVERY[speaker],
+        voice = this.castFor()[how.voice];
+      if (voice) {
+        u.voice = voice;
+        u.lang = voice.lang;
+      }
+      u.pitch = how.pitch;
+      u.rate = how.rate;
       u.volume = 1;
       speechSynthesis.cancel();
       speechSynthesis.speak(u);

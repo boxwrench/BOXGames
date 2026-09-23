@@ -48,6 +48,7 @@ export class Hud {
       <div class="omen" data-omen><b></b><span></span></div>
       <div class="ticker" data-ticker><i>💭</i><span></span></div>
       <div class="bluegill" data-bluegill><p></p></div>
+      <div class="wade" data-wade><img alt="Jeremy Wade on a mountain bike"><blockquote><small>A WORD FROM JEREMY WADE</small><p></p><cite></cite></blockquote></div>
       <svg class="bolt" data-bolt viewBox="0 0 100 100" preserveAspectRatio="none"><polyline /></svg>
       <div class="feed" data-feed></div>
       <div class="pad" data-pad aria-label="Hold to pump, drag to spin"><i><span>HOLD · PUMP<br>DRAG · SPIN</span></i></div>
@@ -230,6 +231,19 @@ export class Hud {
     el.querySelector("span")!.textContent = line;
     this.replay(el, "go");
   }
+  /** Jeremy Wade rolls onto the results screen with a quote from one of his books. */
+  wade(photo: string, text: string, book: string, seconds: number) {
+    const el = $(this.el, "[data-wade]"),
+      img = el.querySelector("img")!;
+    if (img.getAttribute("src") !== photo) img.src = photo;
+    el.querySelector("p")!.textContent = `“${text}”`;
+    el.querySelector("cite")!.textContent = `— Jeremy Wade, ${book}`;
+    el.style.setProperty("--dur", `${seconds}s`);
+    this.replay(el, "go");
+  }
+  hideWade() {
+    $(this.el, "[data-wade]").classList.remove("go");
+  }
   /** The painted bluegill slides in with a speech bubble. */
   bluegill(art: HTMLImageElement | HTMLCanvasElement, line: string, seconds: number) {
     const el = $(this.el, "[data-bluegill]");
@@ -291,5 +305,6 @@ export class Hud {
   }
   hideEnd() {
     $(this.el, "[data-end]").classList.add("hidden");
+    this.hideWade();
   }
 }

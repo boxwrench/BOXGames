@@ -152,3 +152,20 @@
 @keyframes ticker{0%{opacity:0;transform:translateY(12px) scale(.9)}8%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0;transform:translateY(-8px)}}
 @media (pointer:coarse){.ticker{bottom:auto;top:22%}}
 .warp{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0}
+
+/* Jeremy Wade on the results screen: rolls in from the right, quote card beside him. */
+.wade{position:absolute;inset:auto 0 0 auto;width:100%;height:100%;z-index:6;pointer-events:none;opacity:0}
+.wade img{position:absolute;right:-2%;bottom:0;height:min(72vh,600px);filter:drop-shadow(0 14px 24px #000a)}
+.wade blockquote{position:absolute;left:3%;bottom:16%;margin:0;max-width:min(27vw,380px);padding:16px 20px;background:#fffdf5;color:#1b1233;border:3px solid #1b1233;border-radius:16px;box-shadow:0 6px 0 #1b1233;font-family:Georgia,serif}
+.wade small{display:block;font:900 12px/1 system-ui,sans-serif;letter-spacing:2px;color:#c2410c;margin-bottom:8px}
+.wade p{margin:0;font-size:clamp(15px,1.9vw,21px);font-style:italic;line-height:1.35}
+.wade cite{display:block;margin-top:10px;font-size:13px;font-style:normal;opacity:.8}
+.wade.go{animation:wadein var(--dur,14s) ease-out forwards}
+.wade.go img{animation:waderide var(--dur,14s) cubic-bezier(.2,1.1,.3,1) forwards}
+.wade.go blockquote{animation:wadequote var(--dur,14s) ease-out forwards}
+@keyframes wadein{0%,100%{opacity:1}}
+@keyframes waderide{0%{transform:translateX(110%)}8%{transform:translateX(-2%)}11%{transform:none}93%{transform:none}100%{transform:translateX(115%)}}
+@keyframes wadequote{0%,9%{opacity:0;transform:scale(.8)}13%{opacity:1;transform:none}92%{opacity:1}100%{opacity:0}}
+@media (orientation:portrait){.wade img{height:20vh;right:auto;left:-2%}.wade blockquote{left:16px;right:16px;top:10%;bottom:auto;max-width:none;padding:12px 14px}.wade p{font-size:15px}}
+@keyframes waderideL{0%{transform:translateX(-110%)}8%{transform:translateX(2%)}11%{transform:none}93%{transform:none}100%{transform:translateX(-115%)}}
+@media (orientation:portrait){.wade.go img{animation-name:waderideL}}
