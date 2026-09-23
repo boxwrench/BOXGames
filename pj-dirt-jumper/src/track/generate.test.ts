@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { TrackGen } from "./generate";
 import { createRider, step } from "../sim/rider";
-import { botActions } from "../sim/bot";
+import { botActions, stuntActions } from "../sim/bot";
 import { T } from "../tuning";
 test("same seed builds the same trail", () => {
   const a = new TrackGen(42),
@@ -101,4 +101,17 @@ test("a rider who never pops can still get through the backyard", () => {
     const { r } = ride(seed, 390, -1);
     assert.ok(r.x >= 390 && r.state !== "bailed", `seed ${seed}: ${r.state} at ${r.x.toFixed(0)} m`);
   }
+});
+test("the stunt autopilot lands Superman grabs without bailing", () => {
+  let grabs = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const g = new TrackGen(seed),
+      r = createRider();
+    g.ensure(1300);
+    for (let i = 0; i < 400 * T.simHz && r.x < 1000 && (r.state === "riding" || r.state === "air"); i++)
+      for (const e of step(r, stuntActions(r, g.track), g.track, 1 / T.simHz))
+        if (e.type === "land") grabs += e.tricks.filter((t) => t.kind === "grab").length;
+    assert.notEqual(r.state, "bailed", `seed ${seed}`);
+  }
+  assert.ok(grabs > 40, `${grabs} grabs`);
 });
