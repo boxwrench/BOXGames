@@ -113,9 +113,9 @@
 .omen.holy b{font-family:Georgia,"Times New Roman",serif;font-style:normal;letter-spacing:4px;color:#fff3b0;text-shadow:0 0 30px #ffb030,0 0 80px #ff7a2e,0 5px 0 #5a2a00;-webkit-text-stroke:2px #5a2a00}
 .omen.go{animation:omen 3.6s ease-out forwards}
 @keyframes omen{0%{opacity:0;transform:scale(.4) rotate(-6deg);filter:blur(10px)}10%{opacity:1;transform:scale(1.12) rotate(1deg);filter:none}16%{transform:scale(1)}82%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
-.bluegill{position:absolute;right:-10px;bottom:12%;width:min(60vw,520px);opacity:0;pointer-events:none;transform:translateX(110%)}
+.bluegill{z-index:5;position:absolute;right:-10px;bottom:12%;width:min(60vw,520px);opacity:0;pointer-events:none;transform:translateX(110%)}
 .bluegill canvas{width:100%;height:auto;display:block;filter:drop-shadow(0 12px 18px #0008)}
-.bluegill p{position:absolute;left:-2%;top:-6%;margin:0;padding:12px 18px;background:#fffdf5;color:#1b1233;font-size:clamp(16px,2.4vw,24px);font-weight:800;font-family:Georgia,serif;font-style:italic;border-radius:18px;border:3px solid #1b1233;box-shadow:0 5px 0 #1b1233}
+.bluegill p{position:absolute;right:10%;bottom:86%;width:max-content;max-width:min(64vw,440px);margin:0;padding:12px 18px;background:#fffdf5;color:#1b1233;font-size:clamp(16px,2.4vw,24px);font-weight:800;font-family:Georgia,serif;font-style:italic;border-radius:18px;border:3px solid #1b1233;box-shadow:0 5px 0 #1b1233}
 .bluegill p::after{content:"";position:absolute;left:14%;bottom:-16px;border:9px solid transparent;border-top-color:#1b1233}
 .bluegill.go{animation:bluegill var(--dur,6s) cubic-bezier(.2,1.2,.3,1) forwards}
 @keyframes bluegill{0%{opacity:1;transform:translateX(110%) rotate(8deg)}10%{transform:translateX(0) rotate(-3deg)}14%{transform:translateX(0) rotate(0)}50%{transform:translateY(-6px)}88%{opacity:1;transform:translateX(0)}100%{opacity:1;transform:translateX(115%) rotate(6deg)}}
@@ -124,7 +124,7 @@
 .bolt.go{animation:bolt .5s steps(1) forwards}
 @keyframes bolt{0%{opacity:1}20%{opacity:0}35%{opacity:1}60%{opacity:.6}100%{opacity:0}}
 .end .deep{font-size:14px;font-weight:800;color:#8ff7ff;margin:0}
-@media (pointer:coarse){.omen{top:14%}.bluegill{bottom:28%;width:min(46vw,380px)}}
+@media (pointer:coarse){.omen{top:14%}.bluegill{bottom:12%;width:min(36vw,300px)}.bluegill p{font-size:14px;padding:8px 12px;max-width:min(58vw,420px)}}
 .omen span:empty{display:none}.omen.holy{top:58%}@media (pointer:coarse){.omen.holy{top:52%}}
 /* ——— Title screen ——— */
 .hud.attract>*:not(.titlescreen):not(.callout):not(.floaters):not(.flash):not(.zoomlines):not(.edge):not(.topright){visibility:hidden}

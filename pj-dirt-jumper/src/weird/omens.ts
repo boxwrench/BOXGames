@@ -56,12 +56,13 @@ export class Omens {
       this.god = { tex: t, aspect: (t.image as HTMLImageElement).height / (t.image as HTMLImageElement).width };
     });
   }
-  start(kind: OmenKind, dur: number) {
+  /** `line` is what Dad Bluegill says when the omen is his. */
+  start(kind: OmenKind, dur: number, line = "I'm proud of you, son.") {
     this.running.find((r) => r.kind === kind)?.end();
     this.running = this.running.filter((r) => r.kind !== kind);
     const make: Record<OmenKind, () => Running> = {
       bobberMoon: () => this.bobberMoon(dur),
-      proudBluegill: () => this.proudBluegill(dur),
+      proudBluegill: () => this.proudBluegill(dur, line),
       fishRain: () => this.fishRain(dur),
       landTrout: () => this.landTrout(dur),
       bassGod: () => this.bassGod(dur),
@@ -117,11 +118,15 @@ export class Omens {
     );
   }
   /** The lifelike bluegill slides in to tell PJ it's proud of them. */
-  private proudBluegill(dur: number) {
-    this.stage.hud.bluegill(this.bluegill, "I'm proud of you, son.", dur);
+  private proudBluegill(dur: number, line: string) {
     this.stage.sound.play("choir");
-    this.stage.sound.speak("I'm proud of you, son.", 0.7, 0.85);
+    this.dad(line, dur);
     return this.run("proudBluegill", dur, () => 0, () => {});
+  }
+  /** Dad Bluegill drops in with a word of advice, in his dad voice. */
+  dad(line: string, seconds = 5 + line.length / 18) {
+    this.stage.hud.bluegill(this.bluegill, line, seconds);
+    this.stage.sound.speak(line, 0.7, 0.85);
   }
   /** Fish fall from the sky around PJ; any PJ touches is caught. */
   private fishRain(dur: number) {

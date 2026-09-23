@@ -14,7 +14,7 @@ import type { Track } from "./track/track";
 import { createRider, step, wrapAngle, type BailReason, type Rider, type SimEvent } from "./sim/rider";
 import { botActions, stuntActions } from "./sim/bot";
 import { Score, flipName } from "./score/score";
-import { Lines, landKey } from "./lines";
+import { DAD_FIRST, Lines, landKey } from "./lines";
 import { Sound } from "./audio/sound";
 import { storage } from "./storage";
 import { Director, OMENS, type OmenKind } from "./weird/director";
@@ -74,6 +74,10 @@ export class Game {
   private perfectStreak = 0;
   private chatterIn = 16;
   private speedQuipAt = -99;
+  /** Dad Bluegill drops back in once PJ has met him; clock of his next visit. */
+  private dadMet = false;
+  private dadIn = 0;
+  private dadAt = -99;
   constructor(
     container: HTMLElement,
     public seed: number,
@@ -141,6 +145,7 @@ export class Game {
     this.frozen = this.ended = false;
     this.perfectStreak = 0;
     this.chatterIn = 12 + Math.random() * 8;
+    this.dadMet = false;
     this.riderView.reassemble();
     this.fx.clear();
     this.trail.clear();
@@ -209,7 +214,7 @@ export class Game {
         this.hud.landing(res, line);
         this.perfectStreak = e.grade === "perfect" ? this.perfectStreak + 1 : 0;
         if (this.perfectStreak >= 3) this.hud.banner(this.lines.pick("streak", this.depth, { n: this.perfectStreak }));
-        if (res.points >= 5000) this.sound.speak(line, 1.1, 1.05, 8);
+        if (res.points >= 5000 && !(this.dadMet && Math.random() < 0.35 && this.dad("dadHype"))) this.sound.speak(line, 1.1, 1.05, 8);
         if (res.points) {
           const sp = this.screen(r.x, r.y + 1.6);
           this.hud.floater(`+${res.points.toLocaleString("en-US")}${res.multiplier > 1 ? ` ×${res.multiplier}` : ""}`, sp.x, sp.y, res.points >= 5000);
@@ -277,16 +282,29 @@ export class Game {
       this.hud.ticker(this.lines.pick("speed", this.depth));
       return;
     }
+    if (this.dadMet && (this.dadIn -= dt) <= 0 && r.state === "riding" && this.dad("dad")) {
+      this.score.award(T.dadPoints);
+      this.hud.banner(`FATHERLY WISDOM +${T.dadPoints}`);
+      return;
+    }
     this.chatterIn -= dt;
     if (this.chatterIn > 0 || r.state !== "riding") return;
     this.chatterIn = 14 + Math.random() * 12;
     this.hud.ticker(this.lines.pick("chatter", this.depth));
   }
+  /** Dad Bluegill pipes up (not too often); true if he did. */
+  private dad(key: "dad" | "dadHype" | "dadBail") {
+    if (this.clock - this.dadAt < 12) return false;
+    this.dadAt = this.clock;
+    this.dadIn = 35 + Math.random() * 25;
+    this.omens.dad(this.lines.pick(key, this.depth));
+    return true;
+  }
   /** Test hook: summon an omen now (art review, smoke tests). */
   summon(kind: OmenKind) {
     const o = OMENS.find((x) => x.kind === kind)!;
     this.hud.omen(o.title, kind === "proudBluegill" ? "" : o.line, kind === "bassGod");
-    this.omens.start(kind, o.duration);
+    this.startOmen(kind, o.duration);
   }
   /** Test hook: wipe out right now (smoke tests use it to capture the yard sale). */
   crash() {
@@ -333,6 +351,10 @@ export class Game {
       depth: this.director.depth,
       omens: this.omensSeen,
     });
+    if (this.dadMet && reason !== "stalled") {
+      this.dadAt = -99;
+      this.dad("dadBail");
+    }
   }
   /** Rooster tail while pumping downhill, dust at speed, and a fire trail at max Flow. */
   private emit(dt: number, r: Rider, x: number, y: number, pitch: number) {
@@ -373,6 +395,15 @@ export class Game {
       rect = this.stage.renderer.domElement.getBoundingClientRect();
     return { x: rect.left + ((p.x + 1) * rect.width) / 2, y: rect.top + ((1 - p.y) * rect.height) / 2 };
   }
+  /** The first time Dad appears he's simply proud; after that he has advice, and keeps dropping by. */
+  private startOmen(kind: OmenKind, duration: number) {
+    if (kind === "proudBluegill") {
+      this.omens.start(kind, duration, this.dadMet ? this.lines.pick("dad", this.depth) : DAD_FIRST);
+      this.dadMet = true;
+      this.dadAt = this.clock;
+      this.dadIn = 30 + Math.random() * 20;
+    } else this.omens.start(kind, duration);
+  }
   /** Depth milestones summon omens; their buffs and depth scale the score; fish rain pays per catch. */
   private deepWater(r: Rider, dt: number, x: number, y: number) {
     if (r.state === "riding" || r.state === "air") {
@@ -385,7 +416,7 @@ export class Game {
         this.hud.pulse("#8ff7ff");
         this.hud.ticker(this.lines.pick("milestone", this.depth));
         this.sound.play("depth");
-        this.omens.start(m.omen.kind, m.omen.duration);
+        this.startOmen(m.omen.kind, m.omen.duration);
       }
     }
     this.director.tick(dt);

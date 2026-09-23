@@ -47,6 +47,11 @@ test("every named combo has its own headlines", () => {
     assert.ok(new Lines().combo(name!));
   }
 });
+test("dad gets more lost the deeper the run", () => {
+  assert.ok(Lines.pool("dad", 0).length >= 20);
+  assert.ok(!Lines.pool("dad", 0).includes("I've been dead since Tuesday, sport. Keep pumping."));
+  assert.ok(Lines.pool("dad", 4).includes("I've been dead since Tuesday, sport. Keep pumping."));
+});
 test("landing lines scale with points", () => {
   assert.equal(landKey(300), "small");
   assert.equal(landKey(2000), "big");

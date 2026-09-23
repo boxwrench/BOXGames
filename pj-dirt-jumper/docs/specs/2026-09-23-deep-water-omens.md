@@ -22,6 +22,11 @@ the sun into a Bass God").
 | 6 | The Sky Is a Lake | The sky floods: water gradient, rising bubbles, giant fish swimming overhead | ×1.5 for 16 s |
 | 7 | Don't Take the Bait | A giant hook with a wriggling worm descends ahead of PJ, then yanks away | +3,000, ×2 for 10 s |
 
+**Dad Bluegill** (added at the user's request, "more of the absurd proud bluegill father, with outdated advice, like
+50's Leave It to Beaver stuff"): once met, he keeps dropping in every 35–60 s with sitcom-dad advice (+300 each),
+sometimes cheers a huge landing, and consoles PJ on the results screen after a wipeout. Later Proud Bluegill omens use
+his advice instead of the first line. His lines get more lost the deeper the run goes (`dad` in `src/lines.ts`).
+
 Omens are presentation plus score effects only — they never change physics, so the 200-seed fairness test stays valid.
 
 ## Architecture

@@ -63,5 +63,6 @@ export const T = {
   milestoneBonus: 500,
   depthMultStep: 0.1,
   depthMultMax: 2,
-  catchPoints: 250, // s of predicted air that earns apex slow-mo
+  catchPoints: 250, // per fish caught during fish rain
+  dadPoints: 300, // each time Dad Bluegill drops back in with advice
 } as const;
