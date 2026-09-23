@@ -152,6 +152,23 @@ test("landing reports the air's tricks", () => {
   const { land } = touchdown(-0.5, 0, { flips: 1, spun: TAU, grabTime: [0.5, 0, 0.1] });
   assert.deepEqual(land && land.type === "land" && land.tricks, [
     { kind: "flip", dir: "back", n: 1 },
-    { kind: "grab", grab: 0, seconds: 0.5 },
+    { kind: "grab", grab: 0, seconds: 0.5, releasedAt: NaN },
   ]);
+});
+test("Flow raises the speed cap pumping can reach", () => {
+  // Steep enough that pumping could exceed the raised cap, shallow enough that gravity alone can't.
+  const down = line(-0.15),
+    r = Object.assign(createRider(), { x: -900, v: 20, flow: 5 });
+  run(r, down, () => ({ ...NO_ACTIONS, pump: true }), 40);
+  assert.ok(Math.abs(r.v - (T.maxSpeed + 5 * T.flowSpeed)) < 0.01, `v ${r.v}`);
+});
+test("landing reports apex time and when each grab was let go", () => {
+  const t = line(0),
+    r = flying(t, { vx: 10, vy: 5 }),
+    events = run(r, t, (r) => ({ ...NO_ACTIONS, grab: [false, false, r.airTime < 0.45] }), 3, (r) => r.state !== "air"),
+    land = events.find((e) => e.type === "land");
+  assert.ok(land && land.type === "land");
+  assert.ok(Math.abs(land.apexTime - 5 / T.airGravity) < 0.02, `apex ${land.apexTime}`);
+  const nh = land.tricks.find((k) => k.kind === "grab" && k.grab === 2);
+  assert.ok(nh && nh.kind === "grab" && Math.abs(nh.releasedAt - 0.45) < 0.02);
 });

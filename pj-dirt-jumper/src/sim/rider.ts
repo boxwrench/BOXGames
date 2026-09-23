@@ -10,13 +10,13 @@ export const NO_ACTIONS: Actions = { pump: false, spin: 0, grab: [false, false, 
 export type RiderState = "riding" | "air" | "bailed" | "stalled";
 export type Grade = "perfect" | "buttery" | "clean" | "sketchy";
 export type BailReason = "cased" | "huck" | "sideways" | "grab";
-export type Trick = { kind: "flip"; dir: "back" | "front"; n: number } | { kind: "grab"; grab: number; seconds: number };
+export type Trick = { kind: "flip"; dir: "back" | "front"; n: number } | { kind: "grab"; grab: number; seconds: number; releasedAt: number };
 export type SimEvent =
   | { type: "stalled" }
   | { type: "pop"; perfect: boolean }
   | { type: "takeoff"; speed: number }
   | { type: "flip"; dir: "back" | "front"; total: number }
-  | { type: "land"; grade: Grade; tricks: Trick[]; airTime: number; angleError: number }
+  | { type: "land"; grade: Grade; tricks: Trick[]; airTime: number; angleError: number; apexTime: number }
   | { type: "bail"; reason: BailReason };
 export interface Rider {
   /** Position, metres. On the ground y follows the trail. */
@@ -51,7 +51,13 @@ export interface Rider {
   grab: number;
   grabBlend: number;
   grabTime: [number, number, number];
+  /** Air time at which each grab was last let go (NaN = not this air). */
+  grabRelease: [number, number, number];
+  /** Air time of the top of the arc (NaN until reached). */
+  apexTime: number;
   airTime: number;
+  /** Flow level 0…5 (set by the score): raises the pump/landing speed cap. */
+  flow: number;
   state: RiderState;
 }
 export const createRider = (): Rider => ({
@@ -76,14 +82,18 @@ export const createRider = (): Rider => ({
   grab: -1,
   grabBlend: 0,
   grabTime: [0, 0, 0],
+  grabRelease: [NaN, NaN, NaN],
+  apexTime: NaN,
   airTime: 0,
+  flow: 0,
   state: "riding",
 });
 const TAU = Math.PI * 2;
 export const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 /** Adds a rider-made speed change: gains stop at maxSpeed (never cutting speed gravity already gave), losses always apply. */
-const boost = (v: number, dv: number) => (dv > 0 ? Math.max(v, Math.min(T.maxSpeed, v + dv)) : v + dv);
+const boost = (v: number, dv: number, cap: number) => (dv > 0 ? Math.max(v, Math.min(cap, v + dv)) : v + dv);
+const speedCap = (r: Rider) => T.maxSpeed + r.flow * T.flowSpeed;
 /** Advances the rider by dt and reports what happened (spec §5). */
 export function step(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   if (r.state === "riding") return ride(r, a, track, dt);
@@ -112,7 +122,7 @@ function ride(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   r.v += (-T.gravity * sin - T.rollingResistance - T.drag * r.v * r.v) * dt;
   // On a lip face, holding pump only loads the pop; while wobbling, PJ can't pump. Pumping can't push past maxSpeed,
   // but gravity can carry PJ faster (up to hardSpeed), so descents and climbs trade speed without losing it.
-  if (a.pump && toLip > T.lipFace && !r.wobble) r.v = boost(r.v, T.pumpGain * -sin * T.curvatureFactor * dt);
+  if (a.pump && toLip > T.lipFace && !r.wobble) r.v = boost(r.v, T.pumpGain * -sin * T.curvatureFactor * dt, speedCap(r));
   r.v = clamp(r.v, 0, T.hardSpeed);
   const nx = r.x + r.v * cos * dt;
   r.distance += r.v * dt;
@@ -134,6 +144,8 @@ function ride(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
       grab: -1,
       grabBlend: 0,
       grabTime: [0, 0, 0],
+      grabRelease: [NaN, NaN, NaN],
+      apexTime: NaN,
       airTime: 0,
       pop: 0,
       popLip: NaN,
@@ -184,6 +196,7 @@ function fly(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   r.pump = a.pump;
   r.airTime += dt;
   const held = a.grab.findIndex(Boolean);
+  if (r.grab >= 0 && held !== r.grab) r.grabRelease[r.grab] = r.airTime;
   r.grab = held;
   r.grabBlend = clamp(r.grabBlend + (held >= 0 ? dt : -dt) / T.grabBlend, 0, 1);
   if (held >= 0 && r.grabBlend >= 1) r.grabTime[held] += dt;
@@ -202,11 +215,13 @@ function fly(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
     r.flips = Math.sign(r.spun) * done;
     events.push({ type: "flip", dir: r.spun > 0 ? "back" : "front", total: done });
   }
+  const rising = r.vy > 0;
   // Exact for constant gravity, so the flight matches the parabola jumps are designed around.
   r.x += r.vx * dt;
   r.y += (r.vy - 0.5 * T.airGravity * dt) * dt;
   r.vy -= T.airGravity * dt;
   r.distance += Math.hypot(r.vx, r.vy) * dt;
+  if (rising && r.vy <= 0 && Number.isNaN(r.apexTime)) r.apexTime = r.airTime;
   const ground = track.heightAt(r.x);
   if (r.y > ground) return events;
   r.y = ground;
@@ -228,10 +243,10 @@ function fly(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   const tricks: Trick[] = [];
   if (r.flips) tricks.push({ kind: "flip", dir: r.flips > 0 ? "back" : "front", n: Math.abs(r.flips) });
   r.grabTime.forEach((seconds, grab) => {
-    if (seconds >= T.grabMin) tricks.push({ kind: "grab", grab, seconds });
+    if (seconds >= T.grabMin) tricks.push({ kind: "grab", grab, seconds, releasedAt: r.grabRelease[grab] });
   });
   Object.assign(r, {
-    v: clamp(boost(Math.max(0, along), T.landSpeed[grade]), 0, T.hardSpeed),
+    v: clamp(boost(Math.max(0, along), T.landSpeed[grade], speedCap(r)), 0, T.hardSpeed),
     wobble: grade === "sketchy" ? T.wobbleSeconds : 0,
     pitch: angle,
     omega: 0,
@@ -241,6 +256,6 @@ function fly(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
     stall: 0,
     state: "riding",
   } satisfies Partial<Rider>);
-  events.push({ type: "land", grade, tricks, airTime: r.airTime, angleError: err });
+  events.push({ type: "land", grade, tricks, airTime: r.airTime, angleError: err, apexTime: r.apexTime });
   return events;
 }

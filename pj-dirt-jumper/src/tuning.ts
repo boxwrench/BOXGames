@@ -49,4 +49,13 @@ export const T = {
   steer: 0.3, // lip magnetism: takeoff speed may be nudged by up to this fraction
   rampOverMax: 3,
   climbBack: 0.6, // share of a landing's drop the run-out climbs back (1 = level trail, 0 = pure descent) // …but no more than this many metres, so landings don't turn into long speed-giving descents
+  // Scoring and Flow (spec §5.6–5.7)
+  flowMax: 5,
+  flowScore: 0.5, // score multiplier per Flow level
+  flowSpeed: 1, // m/s of extra speed cap per Flow level
+  flowDecay: 4, // s grounded without landing a trick before Flow drops a level
+  grabPointsPerTenth: 60,
+  perfectPopPoints: 150,
+  catchWindow: 0.15, // s either side of the apex to release a No-Hander for Catch-and-Release
+  slowmoAir: 1.2, // s of predicted air that earns apex slow-mo
 } as const;
