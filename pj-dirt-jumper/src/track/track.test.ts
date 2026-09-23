@@ -35,3 +35,11 @@ test("rejects knots that don't move forward", () => {
   assert.throws(() => t.add({ x: 10, y: 0, m: 0 }));
   assert.equal(t.end, 10);
 });
+test("nextJump finds the first lip at or ahead of x", () => {
+  const t = sample();
+  t.jumps.push({ kind: "double", lipX: 3, landX: 5 }, { kind: "tabletop", lipX: 8, landX: 9 });
+  assert.equal(t.nextJump(1)?.lipX, 3);
+  assert.equal(t.nextJump(3)?.lipX, 3);
+  assert.equal(t.nextJump(3.01)?.lipX, 8);
+  assert.equal(t.nextJump(8.5), undefined);
+});

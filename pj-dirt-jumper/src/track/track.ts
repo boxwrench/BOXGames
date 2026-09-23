@@ -4,7 +4,14 @@ export interface Knot {
   /** Slope dy/dx at the knot. */
   m: number;
 }
-export type SectionKind = "runin" | "rollers" | "tabletop";
+export type SectionKind = "runin" | "rollers" | "tabletop" | "double" | "stepup" | "stepdown" | "canyon" | "megahip";
+export type JumpKind = Exclude<SectionKind, "runin" | "rollers">;
+export interface Jump {
+  kind: JumpKind;
+  lipX: number;
+  /** Where the reference rider lands: the sweet spot of the landing ramp. */
+  landX: number;
+}
 export interface Section {
   kind: SectionKind;
   x0: number;
@@ -14,6 +21,7 @@ export interface Section {
 export class Track {
   readonly knots: Knot[] = [];
   readonly sections: Section[] = [];
+  readonly jumps: Jump[] = [];
   get end() {
     return this.knots.at(-1)?.x ?? 0;
   }
@@ -58,5 +66,16 @@ export class Track {
   }
   angleAt(x: number) {
     return Math.atan(this.slopeAt(x));
+  }
+  /** First jump whose lip is at or ahead of x. */
+  nextJump(x: number): Jump | undefined {
+    let lo = 0,
+      hi = this.jumps.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (this.jumps[mid].lipX < x) lo = mid + 1;
+      else hi = mid;
+    }
+    return this.jumps[lo];
   }
 }
