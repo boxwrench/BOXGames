@@ -19,6 +19,14 @@ for (const [name, viewport] of [["desktop", { width: 1440, height: 900 }], ["pho
   const page = await browser.newPage({ viewport, hasTouch: name !== "desktop" });
   page.on("pageerror", (e) => problems.push(`${name}: ${e.message}`));
   page.on("console", (m) => m.type() === "error" && problems.push(`${name}: ${m.text()}`));
+  // Title screen first: shown on a normal load, and Space starts a run.
+  await page.goto(url);
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: `smoke-out/${name}-title.png` });
+  if ((await page.evaluate(() => window.game.mode)) !== "title") problems.push(`${name}: no title screen`);
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(300);
+  if ((await page.evaluate(() => window.game.mode)) !== "play") problems.push(`${name}: Space didn't start a run`);
   await page.goto(url + (url.includes("?") ? "&" : "?") + "autopilot=tricks");
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `smoke-out/${name}-start.png` });

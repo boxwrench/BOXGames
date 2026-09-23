@@ -23,6 +23,8 @@ export class Hud {
   readonly grabButtons: HTMLElement[];
   onRestart = () => {};
   onMute = () => {};
+  onStart = () => {};
+  onMenu = () => {};
   private last = 0;
   private feedText = "";
   private calloutTimer = 0;
@@ -51,6 +53,17 @@ export class Hud {
       <div class="callout" data-callout><b></b><span></span><em></em></div>
       <div class="banner" data-banner></div>
       <div class="popcue" data-popcue><i></i><b></b></div>
+      <div class="titlescreen hidden" data-title-screen role="dialog" aria-label="PJ's Dirt Jumper">
+        <div class="logo"><span class="pj">PJ'S</span><b>DIRT<br>JUMPER</b><i>🎣</i></div>
+        <p class="tagline">PUMP IT · POP IT · SEND IT</p>
+        <button class="go" data-start>SEND IT ▶</button>
+        <p class="t-best" data-t-best></p>
+        <div class="t-controls">
+          <span class="kb"><kbd>Space</kbd> pump · let go on the lip to pop</span><span class="kb"><kbd>←</kbd><kbd>→</kbd> flip</span><span class="kb"><kbd>↑</kbd> Superman <kbd>↓</kbd> Tailwhip <kbd>↑↓</kbd> No-Hander</span>
+          <span class="touch">Hold the left side to pump · let go on lips to pop</span><span class="touch">Drag in the air to flip · fish buttons to grab</span>
+        </div>
+        <small>No fish were harmed. Several were proud of you.</small>
+      </div>
       <div class="end hidden" data-end role="dialog" aria-label="Run over">
         <h1 data-title></h1>
         <p class="newbest hidden" data-newbest>🏆 NEW PERSONAL BEST!</p>
@@ -64,12 +77,15 @@ export class Hud {
         <p class="deep" data-r-deep></p>
         <p class="tip2" data-r-tip></p>
         <button data-again>SEND IT AGAIN ↻</button>
+        <button class="menu" data-menu>MENU</button>
       </div>`;
     parent.append(this.el);
     this.pad = $(this.el, "[data-pad]");
     this.grabButtons = [...this.el.querySelectorAll<HTMLElement>("[data-grab]")];
     $(this.el, "[data-again]").onclick = () => this.onRestart();
     $(this.el, "[data-mute]").onclick = () => this.onMute();
+    $(this.el, "[data-start]").onclick = () => this.onStart();
+    $(this.el, "[data-menu]").onclick = () => this.onMenu();
   }
   update(r: Rider, score: number, flow: number, best: number) {
     const now = performance.now();
@@ -247,6 +263,17 @@ export class Hud {
     $(this.el, "[data-r-tip]").textContent = s.tip;
     $(this.el, "[data-end]").classList.remove("hidden");
     $(this.el, "[data-again]").focus();
+  }
+  /** Title screen over the attract-mode ride; the gameplay HUD hides behind it. */
+  showTitle(best: number, seed: number) {
+    this.el.classList.add("attract");
+    $(this.el, "[data-t-best]").textContent = `${best ? `BEST ${fmt(best)} · ` : ""}DAILY LINE #${seed}`;
+    $(this.el, "[data-title-screen]").classList.remove("hidden");
+    $(this.el, "[data-start]").focus();
+  }
+  hideTitle() {
+    this.el.classList.remove("attract");
+    $(this.el, "[data-title-screen]").classList.add("hidden");
   }
   hideEnd() {
     $(this.el, "[data-end]").classList.add("hidden");

@@ -50,6 +50,8 @@ export class Game {
   private omensSeen = 0;
   /** `?autopilot` lets the reference bot ride; `?autopilot=tricks` adds grabs (demo, smoke tests). */
   autopilot: false | "bot" | "tricks";
+  /** Title screen (attract-mode ride behind it) or a real run. `?autopilot` skips the title (tests, demos). */
+  mode: "title" | "play" = "play";
   /** Event types in order, for tests. */
   readonly log: string[] = [];
   private best = Number(storage("pj-best")) || 0;
@@ -100,16 +102,23 @@ export class Game {
       this.hud.setMuted(this.sound.muted);
     };
     this.hud.setMuted(this.sound.muted);
+    this.hud.onStart = () => this.startRun();
+    this.hud.onMenu = () => this.toTitle();
     const unlock = () => this.sound.unlock();
     addEventListener("pointerdown", unlock);
     addEventListener("resize", () => this.stage.resize());
     addEventListener("keydown", (e) => {
       unlock();
       if (e.code === "KeyM") this.hud.onMute();
-      if ((e.code === "KeyR" || e.code === "Enter") && this.ended) this.reset();
+      if (this.mode === "title" && (e.code === "Space" || e.code === "Enter")) {
+        e.preventDefault();
+        this.startRun();
+      } else if ((e.code === "KeyR" || e.code === "Enter") && this.ended) this.reset();
+      else if (e.code === "Escape" && this.ended) this.toTitle();
     });
     this.stage.resize();
     this.reset(seed);
+    if (!this.autopilot) this.toTitle();
     requestAnimationFrame((t) => this.frame(t));
   }
   reset(seed = this.seed) {
@@ -249,7 +258,23 @@ export class Game {
     this.rider.state = "bailed";
     this.handle({ type: "bail", reason: "sideways" });
   }
+  /** Title screen: the stunt bot rides the Daily Line behind the logo, forever. */
+  toTitle() {
+    this.mode = "title";
+    this.autopilot = "tricks";
+    this.reset();
+    this.hud.showTitle(this.best, this.seed);
+  }
+  startRun() {
+    this.sound.unlock();
+    this.mode = "play";
+    this.autopilot = false;
+    this.hud.hideTitle();
+    this.reset();
+  }
   private endRun(reason: BailReason | "stalled", title: string) {
+    // The attract ride just loops quietly.
+    if (this.mode === "title") return this.reset();
     if (this.ended) return;
     this.ended = true;
     const total = this.score.total,
