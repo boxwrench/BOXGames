@@ -1,4 +1,4 @@
-// Jeremy Wade drops in on the results screen of any run scoring T.wadeScore or more, with one of these quotes (supplied
+// Jeremy Wade drops in on the results screen of a personal best of T.wadeScore or more, with one of these quotes (supplied
 // by the user, verbatim, credited to their books). He only ever says his own words: never invent lines for him.
 const THINK = "How to Think Like a Fish: And Other Lessons from a Lifetime in Angling",
   MONSTERS = "River Monsters: True Stories of the Ones that Didn't Get Away";

@@ -366,7 +366,7 @@ export class Game {
     this.sound.play("cheer");
   }
   private towWarp = 0;
-  /** A run over T.wadeScore earns a word from Jeremy Wade: the next of his quotes, in his (British) voice. */
+  /** A personal best over T.wadeScore earns a word from Jeremy Wade: the next of his quotes, in his (British) voice. */
   showWade() {
     const n = Number(storage("pj-wade")) || 0,
       q = wadeQuote(n);
@@ -427,7 +427,8 @@ export class Game {
       depth: this.director.depth,
       omens: this.omensSeen,
     });
-    if (total >= T.wadeScore) this.showWade();
+    // Wade shows up for the first 200k run, then only for personal bests beyond it.
+    if (total >= T.wadeScore && newBest) this.showWade();
     else if (this.dadMet && reason !== "stalled") {
       this.dadAt = -99;
       this.dad("dadBail");
