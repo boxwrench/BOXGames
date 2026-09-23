@@ -4,7 +4,7 @@
 
 Endless side-on arcade dirt jumping. PJ — a sendy teen who'd rather be fishing — pumps, pops and flips down a seeded trail. Stunts give speed; speed gives bigger stunts.
 
-**Status:** Milestone 3 — attitude: scoring, fishing-named combos, Flow meter, slang callouts, particles, slow-mo, yard-sale crashes, golden-hour art and a synth punk soundtrack. Design: [docs/specs](docs/specs/2026-09-22-pj-dirt-jumper-design.md).
+**Status:** Milestone 3 — attitude: scoring, fishing-named combos, Flow meter, slang callouts, particles, slow-mo, yard-sale crashes, golden-hour art and a synth soundtrack: a rotating setlist (skate punk, surf, ska, chiptune, d-beat, sludge; synthwave in the rocket's slipstream), each song in its own key with intro, verses, choruses and a breakdown, layering up with Flow. Press **N** for the next song (`src/audio/music.ts`). Design: [docs/specs](docs/specs/2026-09-22-pj-dirt-jumper-design.md).
 
 ## Run
 

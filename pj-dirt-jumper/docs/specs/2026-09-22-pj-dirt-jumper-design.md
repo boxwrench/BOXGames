@@ -150,7 +150,7 @@ Trick base values: flip 500 each (double = 1,200, triple = 2,000), grabs 60 per 
 
 ## 9. Audio
 
-All WebAudio synthesis (pattern from `frontier-block/src/sound.ts`): speed-pitched tyre crunch, freewheel buzz in air, pop whoosh, landing thump (heavier on bigger drops), reel "zzzing" on lures, bail crash, and a procedural punk-ish beat whose layers increase with Flow. Mute toggle persisted.
+All WebAudio synthesis (pattern from `frontier-block/src/sound.ts`): speed-pitched tyre crunch, freewheel buzz in air, pop whoosh, landing thump (heavier on bigger drops), reel "zzzing" on lures, bail crash, and a procedural soundtrack whose layers increase with Flow (since 2026-09-23: a rotating setlist of styles with song forms, `audio/music.ts`). Mute toggle persisted.
 
 ## 10. Progression
 

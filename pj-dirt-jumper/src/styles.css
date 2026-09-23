@@ -169,3 +169,7 @@
 @media (orientation:portrait){.wade img{height:20vh;right:auto;left:-2%}.wade blockquote{left:16px;right:16px;top:10%;bottom:auto;max-width:none;padding:12px 14px}.wade p{font-size:15px}}
 @keyframes waderideL{0%{transform:translateX(-110%)}8%{transform:translateX(2%)}11%{transform:none}93%{transform:none}100%{transform:translateX(-115%)}}
 @media (orientation:portrait){.wade.go img{animation-name:waderideL}}
+.nowplaying{position:absolute;left:max(16px,env(safe-area-inset-left));top:78px;display:flex;align-items:baseline;gap:8px;padding:6px 12px;border-radius:10px;background:#1b1233cc;color:#fffdf5;font-size:13px;pointer-events:none;opacity:0;transform:translateX(-12px)}
+.nowplaying i{font-style:normal;color:var(--lime)}.nowplaying b{font-weight:900}.nowplaying span{opacity:.75}
+.nowplaying.go{animation:nowplaying 5s ease-out forwards}
+@keyframes nowplaying{0%{opacity:0;transform:translateX(-12px)}6%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0}}

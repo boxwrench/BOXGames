@@ -118,6 +118,7 @@ export class Game {
     };
     this.hud.setMuted(this.sound.muted);
     this.hud.onStart = () => this.startRun();
+    this.sound.onSong = (s) => this.hud.nowPlaying(s.title, s.band);
     this.hud.onMenu = () => this.toTitle();
     const unlock = () => this.sound.unlock();
     addEventListener("pointerdown", unlock);
@@ -125,6 +126,7 @@ export class Game {
     addEventListener("keydown", (e) => {
       unlock();
       if (e.code === "KeyM") this.hud.onMute();
+      if (e.code === "KeyN") this.sound.nextSong();
       if (this.mode === "title" && (e.code === "Space" || e.code === "Enter")) {
         e.preventDefault();
         this.startRun();
@@ -326,6 +328,7 @@ export class Game {
     this.hud.hang(null);
     this.hud.callout(this.lines.pick("rocket", this.depth), "Pikeminnow Rocket", "huge");
     this.sound.play("rocket");
+    this.hud.nowPlaying("Hyperspace Bait", "Pikeminnow Rocket");
     this.sound.play("whoosh");
     this.sound.speak("Pikeminnow rocket! Hold on!", "hype");
   }
@@ -610,6 +613,7 @@ export class Game {
     this.stage.rim.position.set(x + 30, y + 12, -25);
     this.stage.rim.target.position.set(x, y + 1, 0);
     this.sound.flow = this.score.flow;
+    this.sound.mood = this.rocket.active && this.rocket.phase !== "catch" ? "warp" : "run";
     this.sound.ride(speed, r.state === "riding", r.state === "air");
     this.hud.update(r, this.score.total, this.score.flow, this.best);
     this.hud.air(r);

@@ -46,6 +46,7 @@ export class Hud {
       <div class="flow" data-flow aria-label="Flow"><span>FLOW</span><i></i><i></i><i></i><i></i><i></i><b>ON FIRE</b></div>
       <div class="badges"><span class="depth" data-depth></span><span class="buff" data-buff></span></div>
       <div class="omen" data-omen><b></b><span></span></div>
+      <div class="nowplaying" data-np><i>♫</i><b></b><span></span></div>
       <div class="ticker" data-ticker><i>💭</i><span></span></div>
       <div class="bluegill" data-bluegill><p></p></div>
       <div class="wade" data-wade><img alt="Jeremy Wade on a mountain bike"><blockquote><small>A WORD FROM JEREMY WADE</small><p></p><cite></cite></blockquote></div>
@@ -229,6 +230,13 @@ export class Hud {
     el.className = `omen${holy ? " holy" : ""}`;
     el.querySelector("b")!.textContent = title;
     el.querySelector("span")!.textContent = line;
+    this.replay(el, "go");
+  }
+  /** Now-playing tag when a new song starts. */
+  nowPlaying(title: string, band: string) {
+    const el = $(this.el, "[data-np]");
+    el.querySelector("b")!.textContent = title;
+    el.querySelector("span")!.textContent = band;
     this.replay(el, "go");
   }
   /** Jeremy Wade rolls onto the results screen with a quote from one of his books. */

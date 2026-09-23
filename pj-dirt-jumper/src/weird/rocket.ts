@@ -54,6 +54,10 @@ export class PikeminnowRocket {
   get active() {
     return this.running;
   }
+  /** Which part of the ride it's in (while active). */
+  get phase(): TowPose["phase"] {
+    return this.t < CATCH ? "catch" : this.t < CATCH + WARP ? "warp" : "drop";
+  }
   /** Where the slipstream spits PJ out; set by start. */
   get landing() {
     return this.dropX;
