@@ -71,7 +71,8 @@ interface Layer {
 export class Backdrop {
   readonly root = new THREE.Group();
   private layers: Layer[] = [];
-  private sun = new THREE.Group();
+  /** The sun (the Bass God takes its place during that omen). */
+  readonly sunGroup = new THREE.Group();
   private reflection: THREE.Mesh;
   private clouds: THREE.Group[] = [];
   private birds: THREE.Line[] = [];
@@ -137,9 +138,9 @@ export class Backdrop {
     const disc = new THREE.Mesh(new THREE.CircleGeometry(24, 48), new THREE.MeshBasicMaterial({ color: "#fff0bd", fog: false })),
       glow = new THREE.Sprite(new THREE.SpriteMaterial({ map, color: "#ffc070", transparent: true, blending: THREE.AdditiveBlending, fog: false, depthWrite: false }));
     glow.scale.set(170, 170, 1);
-    this.sun.add(glow, disc);
-    this.sun.position.set(0, 30, -500);
-    this.root.add(this.sun);
+    this.sunGroup.add(glow, disc);
+    this.sunGroup.position.set(0, 30, -500);
+    this.root.add(this.sunGroup);
     for (let i = 0; i < 8; i++) {
       const cloud = new THREE.Group();
       for (let j = 0; j < 7; j++) {
@@ -172,7 +173,7 @@ export class Backdrop {
       const base = Math.floor(camX / width) * width;
       tiles.forEach((t, i) => (t.position.x = base + (i - 1) * width));
     }
-    this.sun.position.x = camX + 70;
+    this.sunGroup.position.x = camX + 70;
     this.reflection.position.x = camX + 34;
     this.boats.forEach((b, i) => {
       b.position.set(Math.floor(camX / 300) * 300 + (i - 1) * 300 + 120, -5.2 + Math.sin(time * 1.3 + i) * 0.15, -95);

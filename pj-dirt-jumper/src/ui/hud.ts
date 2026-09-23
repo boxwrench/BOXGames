@@ -5,6 +5,8 @@ const $ = (root: HTMLElement, sel: string) => root.querySelector<HTMLElement>(se
 const GRAB_ICONS = ["🐟", "🎣", "🐠"];
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
 export interface RunSummary {
+  depth: number;
+  omens: number;
   title: string;
   tip: string;
   score: number;
@@ -37,6 +39,10 @@ export class Hud {
       <div class="stats"><div><b data-speed>0</b><span>KM/H</span></div><div><b data-dist>0</b><span>M</span></div></div>
       <div class="topright"><div class="score"><b data-score>0</b><span>SCORE</span><small data-best></small></div><button class="mute" data-mute aria-label="Toggle sound">🔊</button></div>
       <div class="flow" data-flow aria-label="Flow"><span>FLOW</span><i></i><i></i><i></i><i></i><i></i><b>ON FIRE</b></div>
+      <div class="badges"><span class="depth" data-depth></span><span class="buff" data-buff></span></div>
+      <div class="omen" data-omen><b></b><span></span></div>
+      <div class="bluegill" data-bluegill><p></p></div>
+      <svg class="bolt" data-bolt viewBox="0 0 100 100" preserveAspectRatio="none"><polyline /></svg>
       <div class="feed" data-feed></div>
       <div class="pad" data-pad aria-label="Hold to pump, drag to spin"><i><span>HOLD · PUMP<br>DRAG · SPIN</span></i></div>
       <div class="grabs">${GRAB_NAMES.map((n, i) => `<button data-grab aria-label="${n}"><span>${GRAB_ICONS[i]}</span><b>${n}</b><kbd>${"JKL"[i]}</kbd></button>`).join("")}</div>
@@ -55,6 +61,7 @@ export class Hud {
           <div><dt>BIGGEST AIR</dt><dd data-r-air></dd></div>
         </dl>
         <p class="trick" data-r-trick></p>
+        <p class="deep" data-r-deep></p>
         <p class="tip2" data-r-tip></p>
         <button data-again>SEND IT AGAIN ↻</button>
       </div>`;
@@ -174,6 +181,55 @@ export class Hud {
     el.classList.toggle("show", seconds !== null);
     if (seconds !== null) el.textContent = `HANG TIME ${seconds.toFixed(1)}s`;
   }
+  /** Depth multiplier and any active omen buff, shown under the Flow meter. */
+  badges(depthMult: number, buff: string) {
+    const d = $(this.el, "[data-depth]"),
+      b = $(this.el, "[data-buff]");
+    d.textContent = depthMult > 1 ? `DEPTH ×${depthMult.toFixed(1)}` : "";
+    b.textContent = buff;
+  }
+  /** Depth milestone: a banner with the distance and bonus. */
+  milestone(distance: number, bonus: number, depthMult: number) {
+    this.banner(`${distance.toLocaleString("en-US")} M — DEEPER WATER  +${fmt(bonus)}  ×${depthMult.toFixed(1)}`);
+  }
+  /** Big omen title card; the Bass God gets the holy treatment. */
+  omen(title: string, line: string, holy: boolean) {
+    const el = $(this.el, "[data-omen]");
+    el.className = `omen${holy ? " holy" : ""}`;
+    el.querySelector("b")!.textContent = title;
+    el.querySelector("span")!.textContent = line;
+    this.replay(el, "go");
+  }
+  /** The painted bluegill slides in with a speech bubble. */
+  bluegill(art: HTMLCanvasElement, line: string, seconds: number) {
+    const el = $(this.el, "[data-bluegill]");
+    el.querySelector("canvas")?.remove();
+    const copy = document.createElement("canvas");
+    copy.width = art.width;
+    copy.height = art.height;
+    copy.getContext("2d")!.drawImage(art, 0, 0);
+    el.prepend(copy);
+    el.querySelector("p")!.textContent = line;
+    el.style.setProperty("--dur", `${seconds}s`);
+    this.replay(el, "go");
+  }
+  /** A jagged lightning bolt from the top of the screen down to (sx, sy). */
+  lightning(sx: number, sy: number) {
+    const svg = $(this.el, "[data-bolt]") as unknown as SVGSVGElement,
+      w = innerWidth,
+      h = innerHeight,
+      pts: string[] = [];
+    let x = (sx / w) * 100 + (Math.random() - 0.5) * 30;
+    const tx = (sx / w) * 100,
+      ty = (sy / h) * 100;
+    for (let i = 0; i <= 10; i++) {
+      const k = i / 10;
+      x = x + (tx - x) * 0.3 + (i < 10 ? (Math.random() - 0.5) * 8 : 0);
+      pts.push(`${i === 10 ? tx : x},${k * ty}`);
+    }
+    svg.querySelector("polyline")!.setAttribute("points", pts.join(" "));
+    this.replay(svg as unknown as HTMLElement, "go");
+  }
   setMuted(muted: boolean) {
     $(this.el, "[data-mute]").textContent = muted ? "🔇" : "🔊";
   }
@@ -185,6 +241,7 @@ export class Hud {
     $(this.el, "[data-r-best]").textContent = fmt(s.best);
     $(this.el, "[data-r-air]").textContent = `${s.bigAir.toFixed(1)} s`;
     $(this.el, "[data-r-trick]").textContent = s.bestTrick ? `Best trick: ${s.bestTrick}` : "";
+    $(this.el, "[data-r-deep]").textContent = s.depth ? `Deep water: ${s.depth} milestone${s.depth > 1 ? "s" : ""} · ${s.omens} omen${s.omens === 1 ? "" : "s"} witnessed` : "";
     $(this.el, "[data-r-tip]").textContent = s.tip;
     $(this.el, "[data-end]").classList.remove("hidden");
     $(this.el, "[data-again]").focus();

@@ -26,6 +26,10 @@ npm run build
 
 Land with the bike lined up with the slope; let go of grabs before touchdown. **M** mutes. `?autopilot` lets the reference bot ride (`?autopilot=tricks` adds grabs).
 
+## Deep water
+
+Going further pays. Milestones at 300, 600, 1,000, 1,500, 2,000, 2,600, 3,300, 4,000 m (then every 800 m) pay a growing bonus and raise the depth multiplier (up to ×2). Each summons an omen, stranger the deeper you go: Bobber Moon, a Proud Bluegill ("I'm proud of you, son."), It's Raining Bait (catch fish with your face), a Land Bass, the Bass God (lightning, ×2 score), The Sky Is a Lake, and a giant hook fishing for you. Dev: `game.summon("bassGod")`, `node scripts/omens.mjs`, `node scripts/art.mjs`.
+
 ## Scoring
 
 Distance plus air points: trick base (flip 500 / double 1,200 / triple 2,000, grabs 60 per 0.1 s, perfect pop +150) × number of different tricks × Flow (1 + 0.5 per level) × landing (Perfect 1.5, Buttery 1.2). Sketchy landings bank half. Perfect/Buttery landings fill Flow; at 5 you're ON FIRE. Named combos: Bluegill Backflip, Largemouth Tailwhip, The Double Hookset, Lunker Loop, Full Tackle Box, Catch-and-Release.

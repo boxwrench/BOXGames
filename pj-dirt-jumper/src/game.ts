@@ -17,6 +17,8 @@ import { Score, flipName } from "./score/score";
 import { Lines, landKey } from "./lines";
 import { Sound } from "./audio/sound";
 import { storage } from "./storage";
+import { Director, OMENS, type OmenKind } from "./weird/director";
+import { Omens } from "./weird/omens";
 import { T } from "./tuning";
 const TIPS: Record<BailReason | "stalled", string> = {
   stalled: "Pump the downslopes to keep your speed.",
@@ -43,6 +45,9 @@ export class Game {
   gen: TrackGen;
   rider: Rider;
   score = new Score();
+  director = new Director(0);
+  readonly omens: Omens;
+  private omensSeen = 0;
   /** `?autopilot` lets the reference bot ride; `?autopilot=tricks` adds grabs (demo, smoke tests). */
   autopilot: false | "bot" | "tricks";
   /** Event types in order, for tests. */
@@ -79,7 +84,16 @@ export class Game {
     this.trackView = new TrackView(this.gen.track);
     this.cam = new CameraRig(this.stage.camera);
     if (new URLSearchParams(location.search).has("closeup")) this.cam.zoom = 0.28;
-    this.stage.scene.add(this.backdrop.root, this.trackView.root, this.riderView.root, this.fx.root, this.trail.mesh);
+    this.omens = new Omens({
+      scene: this.stage.scene,
+      camera: this.stage.camera,
+      hud: this.hud,
+      sound: this.sound,
+      fx: this.fx,
+      backdrop: this.backdrop,
+      screen: (x, y, z = 0) => this.screen(x, y, z),
+    });
+    this.stage.scene.add(this.backdrop.root, this.trackView.root, this.riderView.root, this.fx.root, this.trail.mesh, this.omens.root);
     this.hud.onRestart = () => this.reset();
     this.hud.onMute = () => {
       this.sound.toggle();
@@ -104,6 +118,9 @@ export class Game {
     this.rider = createRider();
     this.rider.y = this.gen.track.heightAt(this.rider.x);
     this.score = new Score();
+    this.director = new Director(seed);
+    this.omensSeen = 0;
+    this.omens.clear();
     this.prev = { x: this.rider.x, y: this.rider.y, pitch: this.rider.pitch };
     this.acc = 0;
     this.tier = "";
@@ -219,6 +236,12 @@ export class Game {
         break;
     }
   }
+  /** Test hook: summon an omen now (art review, smoke tests). */
+  summon(kind: OmenKind) {
+    const o = OMENS.find((x) => x.kind === kind)!;
+    this.hud.omen(o.title, kind === "proudBluegill" ? "" : o.line, kind === "bassGod");
+    this.omens.start(kind, o.duration);
+  }
   /** Test hook: wipe out right now (smoke tests use it to capture the yard sale). */
   crash() {
     if (this.rider.state !== "riding" && this.rider.state !== "air") return;
@@ -245,6 +268,8 @@ export class Game {
       newBest,
       bestTrick: this.score.best?.name,
       bigAir: this.score.bestAirTime,
+      depth: this.director.depth,
+      omens: this.omensSeen,
     });
   }
   /** Rooster tail while pumping downhill, dust at speed, and a fire trail at max Flow. */
@@ -281,10 +306,36 @@ export class Game {
     });
   }
   /** World point → CSS pixels. */
-  private screen(x: number, y: number) {
-    const p = new THREE.Vector3(x, y, 0).project(this.stage.camera),
+  private screen(x: number, y: number, z = 0) {
+    const p = new THREE.Vector3(x, y, z).project(this.stage.camera),
       rect = this.stage.renderer.domElement.getBoundingClientRect();
     return { x: rect.left + ((p.x + 1) * rect.width) / 2, y: rect.top + ((1 - p.y) * rect.height) / 2 };
+  }
+  /** Depth milestones summon omens; their buffs and depth scale the score; fish rain pays per catch. */
+  private deepWater(r: Rider, dt: number, x: number, y: number) {
+    if (r.state === "riding" || r.state === "air") {
+      const m = this.director.update(r.distance);
+      if (m) {
+        this.omensSeen++;
+        this.score.award(m.bonus);
+        this.hud.milestone(m.distance, m.bonus, this.director.depthMult);
+        this.hud.omen(m.omen.title, m.omen.kind === "proudBluegill" ? "" : m.omen.line, m.omen.kind === "bassGod");
+        this.hud.pulse("#8ff7ff");
+        this.sound.play("depth");
+        this.omens.start(m.omen.kind, m.omen.duration);
+      }
+    }
+    this.director.tick(dt);
+    this.score.bonus = this.director.mult;
+    const buff = (["bassGod", "giantHook", "landBass", "lakeSky"] as const).find((k) => this.director.active(k) > 0),
+      spec = buff && { bassGod: "DIVINE BITE ×2", giantHook: "BAITED ×2", landBass: "LAND BASS ×1.5", lakeSky: "LAKE MODE ×1.5" }[buff];
+    this.hud.badges(this.director.depthMult, spec ? `${spec} · ${Math.ceil(this.director.active(buff!))}s` : "");
+    const caught = this.omens.update(dt, V.set(x, y, 0), (gx) => this.gen.track.heightAt(gx));
+    if (caught) {
+      this.score.award(caught * T.catchPoints);
+      const sp = this.screen(x, y + 2);
+      this.hud.floater(`CAUGHT ONE! +${caught * T.catchPoints}`, sp.x, sp.y, false);
+    }
   }
   /** Big airs get a beat of slow motion at the top of the arc. */
   private checkApex(r: Rider, track: Track) {
@@ -342,6 +393,7 @@ export class Game {
         speed,
         elapsed,
       );
+    this.deepWater(r, elapsed, x, y);
     this.emit(elapsed, r, x, y, pitch);
     this.trail.update(V.set(x - 0.2 * Math.cos(pitch), y + 0.9, -0.1), r.state === "air" && !this.riderView.yard, this.score.flow >= T.flowMax, elapsed);
     this.hud.hang(r.state === "air" && r.airTime > 0.9 ? r.airTime : null);

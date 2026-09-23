@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-export type Cue = "pop" | "perfectPop" | "land" | "perfect" | "sketchy" | "trick" | "reel" | "bail" | "flowUp" | "onFire" | "stall" | "best" | "airhorn" | "cheer" | "whoosh" | "slam";
+export type Cue = "pop" | "perfectPop" | "land" | "perfect" | "sketchy" | "trick" | "reel" | "bail" | "flowUp" | "onFire" | "stall" | "best" | "airhorn" | "cheer" | "whoosh" | "slam" | "thunder" | "choir" | "splash" | "bubbles" | "depth";
 interface Voice {
   type?: OscillatorType;
   f0: number;
@@ -203,9 +203,62 @@ export class Sound {
         this.voice({ f0: 70, f1: 30, dur: 0.4, vol: 0.9 });
         this.hiss({ dur: 0.12, vol: 0.4, filter: { type: "highpass", f0: 1500 } });
         break;
+      case "thunder":
+        this.hiss({ dur: 0.25, vol: 0.9, filter: { type: "highpass", f0: 800 } });
+        this.hiss({ dur: 2.6, vol: 0.9, attack: 0.05, rate: 0.5, filter: { type: "lowpass", f0: 400, f1: 60 } });
+        this.voice({ f0: 55, f1: 28, dur: 2, vol: 0.7, attack: 0.05 });
+        break;
+      case "choir": {
+        // A heavenly "aaah": stacked triangle voices with slow vibrato, swelling in.
+        for (const f of [220, 277.2, 329.6, 440, 554.4]) {
+          const c = this.ctx,
+            o = c.createOscillator(),
+            vib = c.createOscillator(),
+            depth = c.createGain(),
+            gain = c.createGain();
+          o.type = "triangle";
+          o.frequency.value = f;
+          vib.frequency.value = 5 + Math.random();
+          depth.gain.value = f * 0.012;
+          vib.connect(depth).connect(o.frequency);
+          gain.gain.setValueAtTime(0.0001, t);
+          gain.gain.exponentialRampToValueAtTime(0.05, t + 0.6);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
+          o.connect(gain).connect(this.master!);
+          o.start(t);
+          vib.start(t);
+          o.stop(t + 3.3);
+          vib.stop(t + 3.3);
+        }
+        break;
+      }
+      case "splash":
+        this.hiss({ dur: 0.35, vol: 0.4, filter: { type: "bandpass", f0: 1800, f1: 500, q: 1.2 } });
+        this.voice({ type: "sine", f0: 700, f1: 1500, dur: 0.1, vol: 0.15 });
+        break;
+      case "bubbles":
+        for (let i = 0; i < 8; i++) this.voice({ f0: 500 + Math.random() * 900, f1: 1400 + Math.random() * 900, dur: 0.06, vol: 0.08, at: t + i * 0.09 + Math.random() * 0.05 });
+        break;
+      case "depth":
+        [196, 247, 294, 392].forEach((f, i) => this.voice({ type: "sawtooth", f0: f, dur: 0.3, vol: 0.08, at: t + i * 0.07, filter: { type: "lowpass", f0: 2400 } }));
+        break;
       case "best":
         [523, 659, 784, 1046, 1318].forEach((f, i) => this.voice({ type: "square", f0: f, dur: 0.16, vol: 0.08, at: t + i * 0.08 }));
         break;
+    }
+  }
+  /** Spoken lines through the browser's speech synthesis, if it has a voice (and the game isn't muted). */
+  speak(text: string, pitch = 1, rate = 1) {
+    if (this.muted || typeof speechSynthesis === "undefined") return;
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.pitch = pitch;
+      u.rate = rate;
+      u.volume = 1;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+    } catch {
+      // No voice available: the speech bubble still carries the line.
     }
   }
   private startMusic() {
