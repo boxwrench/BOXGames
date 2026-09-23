@@ -1,4 +1,4 @@
-import type { Track } from "../track/track";
+import type { Jump, Track } from "../track/track";
 import { T } from "../tuning";
 export interface Actions {
   pump: boolean;
@@ -77,6 +77,8 @@ export const createRider = (): Rider => ({
 const TAU = Math.PI * 2;
 export const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+/** Adds a rider-made speed change: gains stop at maxSpeed (never cutting speed gravity already gave), losses always apply. */
+const boost = (v: number, dv: number) => (dv > 0 ? Math.max(v, Math.min(T.maxSpeed, v + dv)) : v + dv);
 /** Advances the rider by dt and reports what happened (spec §5). */
 export function step(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   if (r.state === "riding") return ride(r, a, track, dt);
@@ -101,20 +103,24 @@ function ride(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
     norm = Math.sqrt(1 + slope * slope),
     sin = slope / norm,
     cos = 1 / norm;
-  let accel = -T.gravity * sin - T.rollingResistance - T.drag * r.v * r.v;
-  // On a lip face, holding pump only loads the pop; while wobbling, PJ can't pump.
-  if (a.pump && toLip > T.lipFace && !r.wobble) accel += T.pumpGain * -sin * T.curvatureFactor;
-  r.v = clamp(r.v + accel * dt, 0, T.maxSpeed);
+  r.v += (-T.gravity * sin - T.rollingResistance - T.drag * r.v * r.v) * dt;
+  // On a lip face, holding pump only loads the pop; while wobbling, PJ can't pump. Pumping can't push past maxSpeed,
+  // but gravity can carry PJ faster (up to hardSpeed), so descents and climbs trade speed without losing it.
+  if (a.pump && toLip > T.lipFace && !r.wobble) r.v = boost(r.v, T.pumpGain * -sin * T.curvatureFactor * dt);
+  r.v = clamp(r.v, 0, T.hardSpeed);
   const nx = r.x + r.v * cos * dt;
   r.distance += r.v * dt;
   if (jump && nx >= jump.lipX && r.v >= T.minLaunchSpeed) {
     const angle = track.angleAt(jump.lipX - 1e-6),
-      boost = r.popLip === jump.lipX ? r.pop : 0;
+      boost = r.popLip === jump.lipX ? r.pop : 0,
+      y = track.heightAt(jump.lipX),
+      vx = r.v * Math.cos(angle),
+      vy = r.v * Math.sin(angle) + boost;
     Object.assign(r, {
       x: jump.lipX,
-      y: track.heightAt(jump.lipX),
-      vx: r.v * Math.cos(angle),
-      vy: r.v * Math.sin(angle) + boost,
+      y,
+      vx: steer(jump, y, vx, vy),
+      vy,
       pitch: angle,
       omega: 0,
       spun: 0,
@@ -145,6 +151,18 @@ function ride(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   }
   return events;
 }
+/**
+ * Lip magnetism: nudges takeoff speed (never lift) by up to ±T.steer so the rider's arc comes down on the jump's sweet
+ * spot. Lift still decides airtime (and so tricks) and the landing angle (M2 deviation 5).
+ */
+export function steer(jump: Jump, lipY: number, vx: number, vy: number) {
+  const aim = jump.aim;
+  if (!aim) return vx;
+  const disc = vy * vy + 2 * T.airGravity * (lipY - aim.landY);
+  if (disc < 0) return vx;
+  const t = (vy + Math.sqrt(disc)) / T.airGravity;
+  return clamp((jump.landX - jump.lipX) / t, vx * (1 - T.steer), vx * (1 + T.steer));
+}
 function fly(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   const events: SimEvent[] = [];
   r.airTime += dt;
@@ -167,9 +185,10 @@ function fly(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
     r.flips = Math.sign(r.spun) * done;
     events.push({ type: "flip", dir: r.spun > 0 ? "back" : "front", total: done });
   }
-  r.vy -= T.airGravity * dt;
+  // Exact for constant gravity, so the flight matches the parabola jumps are designed around.
   r.x += r.vx * dt;
-  r.y += r.vy * dt;
+  r.y += (r.vy - 0.5 * T.airGravity * dt) * dt;
+  r.vy -= T.airGravity * dt;
   r.distance += Math.hypot(r.vx, r.vy) * dt;
   const ground = track.heightAt(r.x);
   if (r.y > ground) return events;
@@ -195,7 +214,7 @@ function fly(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
     if (seconds >= T.grabMin) tricks.push({ kind: "grab", grab, seconds });
   });
   Object.assign(r, {
-    v: clamp(Math.max(0, along) + T.landSpeed[grade], 0, T.maxSpeed),
+    v: clamp(boost(Math.max(0, along), T.landSpeed[grade]), 0, T.hardSpeed),
     wobble: grade === "sketchy" ? T.wobbleSeconds : 0,
     pitch: angle,
     omega: 0,

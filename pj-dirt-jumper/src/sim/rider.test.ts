@@ -4,6 +4,7 @@ import { createRider, step, NO_ACTIONS, type Actions, type SimEvent } from "./ri
 import { Track } from "../track/track";
 import { TrackGen } from "../track/generate";
 import { T } from "../tuning";
+import { botActions } from "./bot";
 const PUMP: Actions = { ...NO_ACTIONS, pump: true };
 const dt = 1 / T.simHz;
 /** A straight line with the given slope, long enough for any test. */
@@ -34,8 +35,13 @@ test("on the flat, pumping does nothing and friction slows you", () => {
   assert.equal(ride(flat, PUMP, 2).r.v, ride(flat, NO_ACTIONS, 2).r.v);
   assert.ok(ride(flat, NO_ACTIONS, 2).r.v < 7);
 });
-test("speed is capped at maxSpeed", () => {
-  assert.equal(ride(line(-1), PUMP, 10).r.v, T.maxSpeed);
+test("pumping can't push past maxSpeed", () => {
+  assert.ok(ride(line(-0.1), NO_ACTIONS, 30).r.v < T.maxSpeed - 2);
+  assert.equal(ride(line(-0.1), PUMP, 30).r.v, T.maxSpeed);
+});
+test("gravity can carry PJ past maxSpeed, up to hardSpeed", () => {
+  const fast = ride(line(-0.6), PUMP, 10).r.v;
+  assert.ok(fast > T.maxSpeed + 3 && fast <= T.hardSpeed, `v ${fast}`);
 });
 test("crawling under stallSpeed for stallSeconds ends the run once", () => {
   const { r, events } = ride(line(0), NO_ACTIONS, T.stallSeconds + 0.1, 1);
@@ -59,19 +65,20 @@ test("distance follows the slope while x advances horizontally", () => {
   const { r } = ride(line(-1), NO_ACTIONS, 1, 10);
   assert.ok(r.distance > r.x + 1);
 });
-test("a rider who pumps the backsides keeps rolling; a coaster stalls", () => {
+test("a rider who pumps and pops keeps rolling; a coaster soon stalls or bails", () => {
   const g = new TrackGen(20260922);
   g.ensure(1500);
   const run = (pumper: boolean) => {
     const r = createRider();
-    for (let i = 0; i < 180 * T.simHz && r.state === "riding" && r.x < 1200; i++)
-      step(r, { ...NO_ACTIONS, pump: pumper && g.track.slopeAt(r.x) < 0 }, g.track, dt);
+    for (let i = 0; i < 180 * T.simHz && (r.state === "riding" || r.state === "air") && r.x < 1200; i++)
+      step(r, pumper ? botActions(r, g.track) : NO_ACTIONS, g.track, dt);
     return r;
   };
   const pumper = run(true),
     coaster = run(false);
-  assert.equal(pumper.state, "riding");
+  assert.ok(pumper.state === "riding" || pumper.state === "air", pumper.state);
   assert.ok(pumper.x >= 1200, `pumper only reached ${pumper.x.toFixed(0)} m`);
-  assert.equal(coaster.state, "stalled");
-  assert.ok(coaster.x < 400, `coaster rolled ${coaster.x.toFixed(0)} m`);
+  // Lips launch since M2, so a rider who never pumps or pops either stalls or bails.
+  assert.ok(coaster.state === "stalled" || coaster.state === "bailed", coaster.state);
+  assert.ok(coaster.x < 1200, `coaster rolled ${coaster.x.toFixed(0)} m`);
 });

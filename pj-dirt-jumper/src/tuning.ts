@@ -3,22 +3,23 @@ const deg = Math.PI / 180;
 export const T = {
   simHz: 120,
   gravity: 20, // m/s² on the ground, arcade-heavy
-  airGravity: 13, // lighter in the air for hang time (M2 deviation 2)
+  airGravity: 9, // lighter in the air: long hang time without moon-high apexes (M2 deviation 2)
   rollingResistance: 0.6,
   drag: 0.004,
   pumpGain: 9,
   curvatureFactor: 1,
-  maxSpeed: 22,
+  maxSpeed: 22, // m/s that pumping and landing bonuses can reach (before Flow bonuses)
+  hardSpeed: 32, // m/s gravity can carry PJ to on descents
   startSpeed: 8,
   stallSpeed: 2,
   stallSeconds: 3,
   preloadSeconds: 0.35,
   // Pop and takeoff (spec §5.3)
-  lipFace: 5, // m before a lip where holding pump only loads the pop
+  lipFace: 8, // m before a lip where holding pump only loads the pop (long enough to fully load at max speed)
   popWindow: 1.2,
   perfectPopWindow: 0.3,
-  popBoost: 4.5,
-  perfectPopBonus: 1.5,
+  popBoost: 3,
+  perfectPopBonus: 1.2,
   minLaunchSpeed: 3,
   // Air (spec §5.4)
   spinRate: 420 * deg,
@@ -39,6 +40,12 @@ export const T = {
   wobbleSeconds: 0.5,
   // Track design
   botPopAt: 1, // the reference bot releases this far before the lip (a good, not perfect, pop)
-  rampShort: 0.3, // landing ramp starts this fraction of the jump length before the sweet spot
-  rampOver: 0.6, // and runs this fraction past it
+  rampClear: 0.9, // m the landing ramp starts under the flight path, closing to 0 at the sweet spot
+  rampCross: 0.08, // m of that closing done linearly, so the arc crosses the ramp rather than grazing it
+  rampMin: 4, // m of landing ramp from the deck edge to the sweet spot…
+  rampShare: 0.15, // …or this share of the lip-to-deck distance, whichever is longer
+  rampOver: 0.45, // the landing ramp runs this fraction of the jump length past the sweet spot
+  steer: 0.3, // lip magnetism: takeoff speed may be nudged by up to this fraction
+  rampOverMax: 3,
+  climbBack: 0.6, // share of a landing's drop the run-out climbs back (1 = level trail, 0 = pure descent) // …but no more than this many metres, so landings don't turn into long speed-giving descents
 } as const;

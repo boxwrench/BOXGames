@@ -44,7 +44,7 @@ test("releasing pump in the perfect window pops hard", () => {
     r = riding(15, 12),
     events = run(r, t, (r) => ({ ...NO_ACTIONS, pump: 20 - r.x > 0.2 }), 2, (r) => r.state === "air");
   assert.deepEqual(events.find((e) => e.type === "pop"), { type: "pop", perfect: true });
-  assert.ok(r.vy - r.vx * 0.7 > 5.5, `pop added ${r.vy - r.vx * 0.7}`);
+  assert.ok(r.vy - r.vx * 0.7 > T.popBoost + T.perfectPopBonus - 0.3, `pop added ${r.vy - r.vx * 0.7}`);
 });
 test("releasing before the window does nothing", () => {
   const t = kicker(),

@@ -6,11 +6,20 @@ export interface Knot {
 }
 export type SectionKind = "runin" | "rollers" | "tabletop" | "double" | "stepup" | "stepdown" | "canyon" | "megahip";
 export type JumpKind = Exclude<SectionKind, "runin" | "rollers">;
+/** How a designed jump expects riders to fly: takeoff steering lands riders on its sweet spot. */
+export interface JumpAim {
+  /** Height of the sweet spot (the reference rider's landing). */
+  landY: number;
+  /** Takeoff lift of a good pop and of a perfect pop, m/s. */
+  vyRef: number;
+  vyPop: number;
+}
 export interface Jump {
   kind: JumpKind;
   lipX: number;
   /** Where the reference rider lands: the sweet spot of the landing ramp. */
   landX: number;
+  aim?: JumpAim;
 }
 export interface Section {
   kind: SectionKind;
