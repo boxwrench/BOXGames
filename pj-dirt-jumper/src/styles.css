@@ -22,3 +22,21 @@
 .end button:active{translate:0 4px;box-shadow:0 2px 0 var(--ink)}
 .fallback{padding:10vh 8%;max-width:720px}.fallback h1{font-size:40px}
 @media (orientation:portrait){.stats b{font-size:30px}.tip{white-space:normal;width:86%;text-align:center}}
+.pad i span{font-size:10px;line-height:1.5}
+.grabs{position:absolute;right:max(16px,env(safe-area-inset-right));bottom:max(20px,env(safe-area-inset-bottom));display:flex;gap:10px;pointer-events:auto}
+.grabs button{width:72px;height:72px;border-radius:50%;border:3px solid #ffffff66;background:#1b123366;color:var(--cream);display:grid;place-items:center;align-content:center;gap:0;touch-action:none;-webkit-tap-highlight-color:transparent;font:inherit;cursor:pointer;padding:0}
+.grabs button span{font-size:24px;line-height:1}.grabs button b{font-size:8px;letter-spacing:.5px}.grabs button kbd{display:none;font:inherit;font-size:9px;opacity:.8}
+.grabs button.down{background:var(--pink);border-color:var(--pink);transform:scale(.92)}
+@media (pointer:fine){.grabs button{opacity:.55}.grabs button kbd{display:block}}
+.callout{position:absolute;left:50%;top:18%;translate:-50% 0;display:grid;justify-items:center;gap:4px;opacity:0;pointer-events:none;text-align:center}
+.callout b{font-size:clamp(30px,6vw,64px);font-weight:900;letter-spacing:-1px;color:var(--lime);-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;text-shadow:0 5px 0 var(--ink)}
+.callout span{font-size:13px;font-weight:900;letter-spacing:1.5px;background:#1b1233cc;padding:5px 12px;border-radius:20px}.callout span:empty{display:none}
+.callout.pop b{color:#ffd23a;font-size:clamp(24px,4.5vw,44px)}.callout.bad b{color:var(--pink)}.callout.trick b{color:var(--cream)}
+.callout.show{opacity:1}.callout.go{animation:pop-in .35s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop-in{from{transform:scale(1.8);opacity:0}to{transform:scale(1);opacity:1}}
+.banner{position:absolute;left:0;right:0;top:34%;text-align:center;font-size:clamp(22px,4vw,40px);font-weight:900;letter-spacing:4px;color:var(--cream);-webkit-text-stroke:1.5px var(--ink);paint-order:stroke fill;opacity:0;transition:opacity .4s,letter-spacing .8s}
+.banner.show{opacity:1;letter-spacing:8px}
+@media (orientation:portrait){.grabs{flex-direction:column}.grabs button{width:64px;height:64px}}
+.tip .touch{display:none}
+@media (pointer:coarse){.tip .kb{display:none}.tip .touch{display:inline}.tip{bottom:auto;top:max(70px,calc(env(safe-area-inset-top) + 56px));font-size:12px;white-space:normal;width:min(92%,460px);text-align:center}}
+@media (pointer:coarse){.callout{top:34%}}

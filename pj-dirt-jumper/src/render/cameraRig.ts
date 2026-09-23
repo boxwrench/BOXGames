@@ -8,12 +8,14 @@ export class CameraRig {
   snap() {
     this.snapNext = true;
   }
-  update(x: number, y: number, speed: number, dt: number, portrait: boolean) {
+  update(x: number, y: number, groundY: number, speed: number, dt: number, portrait: boolean) {
     // Narrow portrait screens can't afford much look-ahead or PJ slides off the left edge.
-    const ahead = portrait ? 0.5 + speed * 0.12 : 3 + speed * 0.45,
-      back = (portrait ? 24 : 11) + speed * 0.3,
-      look = new THREE.Vector3(x + ahead, y + 2, 0),
-      pos = new THREE.Vector3(x + ahead * 0.8, y + 3.2 + speed * 0.06, back);
+    const air = Math.max(0, y - groundY),
+      ahead = portrait ? 0.5 + speed * 0.12 : 3 + speed * 0.45,
+      back = (portrait ? 24 : 11) + speed * 0.3 + Math.min(10, air * 0.9),
+      midY = groundY + (y - groundY) * 0.6,
+      look = new THREE.Vector3(x + ahead, midY + 2, 0),
+      pos = new THREE.Vector3(x + ahead * 0.8, midY + 3.2 + speed * 0.06, back);
     if (this.snapNext) {
       this.pos.copy(pos);
       this.look.copy(look);

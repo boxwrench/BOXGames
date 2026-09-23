@@ -18,6 +18,18 @@ export function tube(parent: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3,
   return aim(m, a, b);
 }
 const v = (x: number, y: number, z = 0) => new THREE.Vector3(x, y, z);
+export interface RiderPose {
+  x: number;
+  y: number;
+  pitch: number;
+  pumping: boolean;
+  airborne: boolean;
+  /** Grab being held (−1 none) and its blend 0…1. */
+  grab: number;
+  grabBlend: number;
+  wobble: number;
+}
+const lerpV = (a: THREE.Vector3, b: THREE.Vector3, t: number) => a.clone().lerp(b, t);
 /** Two-bone IK: returns the joint for limbs of length l1/l2 from a to b, bending toward `bend`. */
 function joint(a: THREE.Vector3, b: THREE.Vector3, l1: number, l2: number, bend: THREE.Vector3) {
   const d = Math.min(a.distanceTo(b), l1 + l2 - 1e-3),
@@ -37,6 +49,9 @@ export class RiderView {
   private head = new THREE.Group();
   private pack: THREE.Group;
   private crouch = 0;
+  private shownGrab = 0;
+  private whip = 0;
+  private time = 0;
   constructor() {
     this.root.add(this.bike);
     const frame = mat("#c6ff3d", 0.35),
@@ -101,25 +116,33 @@ export class RiderView {
     tail.rotation.z = Math.PI;
     this.pack.add(bag, lure, tail);
     this.root.add(this.torso, this.head, this.pack);
-    this.pose(0);
+    this.pose(0, -1, 0);
   }
-  /** Places PJ's body for a crouch amount 0 (standing) … 1 (fully compressed). */
-  private pose(c: number) {
-    const hip = v(-0.14, 1.22 - c * 0.38),
-      shoulder = hip.clone().add(v(0.3 + c * 0.1, 0.5 - c * 0.12)),
+  /** crouch 0…1; grab 0 Superman, 1 Tailwhip, 2 No-Hander blended in by g (spec §5.4). */
+  private pose(c: number, grab: number, g: number) {
+    let hip = v(-0.14, 1.22 - c * 0.38),
+      lean = v(0.3 + c * 0.1, 0.5 - c * 0.12);
+    if (grab === 0) {
+      hip = lerpV(hip, v(-0.35, 1.3), g);
+      lean = lerpV(lean, v(0.55, 0.12), g);
+    }
+    const shoulder = hip.clone().add(lean),
       forward = v(1, 0),
       back = v(-1, -0.3);
     let i = 0;
     for (const z of [-0.12, 0.12]) {
-      const foot = v(0.02, 0.42, z),
-        hipZ = hip.clone().setZ(z * 0.8),
-        knee = joint(foot, hipZ, 0.46, 0.46, forward);
+      let foot = v(0.02, 0.42, z);
+      if (grab === 0) foot = lerpV(foot, v(-1.15, 1.3, z * 1.6), g);
+      if (grab === 1) foot = lerpV(foot, v(0.05, 0.75, z * 3), g);
+      const hipZ = hip.clone().setZ(z * 0.8),
+        knee = joint(foot, hipZ, 0.46, 0.46, grab === 0 ? v(0, -1) : forward);
       aim(this.limbs[i++], foot, knee);
       aim(this.limbs[i++], knee, hipZ);
     }
     for (const z of [-0.26, 0.26]) {
-      const hand = v(0.45, 1.1, z),
-        sh = shoulder.clone().setZ(z * 0.7),
+      let hand = v(0.45, 1.1, z);
+      if (grab === 2) hand = lerpV(hand, v(0.1, 1.95, z * 2.4), g);
+      const sh = shoulder.clone().setZ(z * 0.7),
         elbow = joint(sh, hand, 0.32, 0.32, back);
       aim(this.limbs[i++], sh, elbow);
       aim(this.limbs[i++], elbow, hand);
@@ -129,11 +152,17 @@ export class RiderView {
     this.pack.position.copy(hip).lerp(shoulder, 0.6).add(v(-0.2, 0));
     this.pack.rotation.z = this.torso.rotation.z;
   }
-  update(x: number, y: number, angle: number, pumping: boolean, speed: number, dt: number) {
-    this.root.position.set(x, y, 0);
-    this.root.rotation.z = angle;
-    for (const w of this.wheels) w.rotation.z -= (speed * dt) / WHEEL_RADIUS;
-    this.crouch += ((pumping ? 1 : 0) - this.crouch) * Math.min(1, dt * 14);
-    this.pose(this.crouch);
+  update(p: RiderPose, speed: number, dt: number) {
+    this.time += dt;
+    if (p.grab >= 0) this.shownGrab = p.grab;
+    this.root.position.set(p.x, p.y, 0);
+    this.root.rotation.z = p.pitch + (p.wobble > 0 ? Math.sin(this.time * 45) * 0.1 * (p.wobble / 0.5) : 0);
+    for (const w of this.wheels) w.rotation.z -= ((p.airborne ? speed * 0.6 : speed) * dt) / WHEEL_RADIUS;
+    const target = p.pumping && !p.airborne ? 1 : p.airborne ? 0.35 : 0;
+    this.crouch += (target - this.crouch) * Math.min(1, dt * 14);
+    // Tailwhip: the frame whips around the head tube while the grab is held.
+    this.whip = this.shownGrab === 1 && p.grabBlend > 0 ? this.whip + dt * 14 : 0;
+    this.bike.rotation.y = this.whip;
+    this.pose(this.crouch, p.grabBlend > 0 ? this.shownGrab : -1, p.grabBlend);
   }
 }

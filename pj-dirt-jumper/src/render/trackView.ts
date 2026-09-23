@@ -4,7 +4,7 @@ import { mulberry32 } from "../rng";
 const CHUNK = 40,
   STEP = 0.25,
   HALF = 1.8,
-  FLOOR = -12;
+  DEPTH = 30; // soil face hangs this far below the surface
 const dirt = new THREE.MeshStandardMaterial({ color: "#c9824a", roughness: 0.95, side: THREE.DoubleSide });
 const soil = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide });
 const grass = new THREE.MeshStandardMaterial({ color: "#6cc04a", roughness: 0.9, side: THREE.DoubleSide });
@@ -65,7 +65,7 @@ export class TrackView {
       const x = x0 + k * STEP,
         y = this.track.heightAt(x);
       top.push(x, y, HALF, x, y, -HALF);
-      face.push(x, y, HALF, x, FLOOR, HALF);
+      face.push(x, y, HALF, x, y - DEPTH, HALF);
       faceColors.push(upper.r, upper.g, upper.b, lower.r, lower.g, lower.b);
       bank.push(x, y, -HALF, x, y + 0.35, -HALF - 0.6);
     }

@@ -51,7 +51,9 @@ export class Backdrop {
     this.sun.position.set(0, 45, -320);
     this.root.add(this.ground, this.sun);
   }
-  update(camX: number) {
+  /** camX: camera x; baseY: a smoothed trail height near the camera, so hills and fields follow the descent. */
+  update(camX: number, baseY: number) {
+    this.root.position.y = baseY;
     for (const { spec, tiles } of this.layers) {
       const base = Math.floor(camX / spec.width) * spec.width;
       tiles.forEach((t, i) => (t.position.x = base + (i - 1) * spec.width));
