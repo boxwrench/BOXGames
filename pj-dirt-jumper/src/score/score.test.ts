@@ -78,3 +78,10 @@ test("score total is distance plus banked air, and the best air is kept", () => 
   assert.equal(s.total, 123 + s.airPoints);
   assert.equal(s.best?.name, "The Double Hookset");
 });
+test("the depth/omen bonus multiplies air points; awards add straight to the score", () => {
+  const s = new Score();
+  s.bonus = 2;
+  assert.equal(s.handle(land([flip(1)], "clean"))!.points, 1000);
+  s.award(750);
+  assert.equal(s.airPoints, 1750);
+});

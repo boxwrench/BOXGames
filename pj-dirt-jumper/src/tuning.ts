@@ -58,5 +58,10 @@ export const T = {
   grabPointsPerTenth: 60,
   perfectPopPoints: 150,
   catchWindow: 0.15, // s either side of the apex to release a No-Hander for Catch-and-Release
-  slowmoAir: 1.2, // s of predicted air that earns apex slow-mo
+  slowmoAir: 1.2,
+  // Deep water (going further pays; docs/specs/2026-09-23-deep-water-omens.md)
+  milestoneBonus: 500,
+  depthMultStep: 0.1,
+  depthMultMax: 2,
+  catchPoints: 250, // s of predicted air that earns apex slow-mo
 } as const;

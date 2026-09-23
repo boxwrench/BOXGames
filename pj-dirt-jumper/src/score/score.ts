@@ -40,6 +40,8 @@ export class Score {
   distance = 0;
   airPoints = 0;
   flow = 0;
+  /** Depth × omen multiplier applied to air points (set by the game from the director). */
+  bonus = 1;
   best?: AirScore;
   bestAirTime = 0;
   private grounded = 0;
@@ -54,7 +56,7 @@ export class Score {
         e.tricks.reduce((sum, t) => sum + (t.kind === "flip" ? flipPoints(t.n) : Math.round(t.seconds * 10) * T.grabPointsPerTenth), 0) +
         (this.perfectPop ? T.perfectPopPoints : 0),
       multiplier = Math.max(1, e.tricks.length),
-      points = Math.round(base * multiplier * (1 + T.flowScore * this.flow) * LAND_BONUS[e.grade] * (e.grade === "sketchy" ? 0.5 : 1)),
+      points = Math.round(base * multiplier * (1 + T.flowScore * this.flow) * this.bonus * LAND_BONUS[e.grade] * (e.grade === "sketchy" ? 0.5 : 1)),
       before = this.flow;
     this.flow = Math.min(T.flowMax, Math.max(0, this.flow + FLOW_CHANGE[e.grade]));
     if (e.tricks.length) this.grounded = 0;
@@ -76,6 +78,10 @@ export class Score {
     this.perfectPop = false;
     if (points && (!this.best || points > this.best.points)) this.best = result;
     return result;
+  }
+  /** Points from outside the trick system: depth milestones, omen bonuses, fish caught. */
+  award(points: number) {
+    this.airPoints += Math.round(points);
   }
   /** Tracks distance and Flow decay; returns true when Flow just dropped a level. */
   tick(dt: number, grounded: boolean, distance: number) {
