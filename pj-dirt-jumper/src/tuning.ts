@@ -16,8 +16,9 @@ export const T = {
   preloadSeconds: 0.35,
   // Pop and takeoff (spec §5.3)
   lipFace: 8, // m before a lip where holding pump only loads the pop (long enough to fully load at max speed)
-  popWindow: 1.2,
-  perfectPopWindow: 0.3,
+  popWindow: 0.3, // s before the lip in which letting go pops
+  perfectPopWindow: 0.1, // s before the lip for a perfect pop
+  latePop: 0.12, // s after leaving the lip in which letting go still pops (normal strength)
   popBoost: 3,
   perfectPopBonus: 1.2,
   minLaunchSpeed: 3,
@@ -39,7 +40,7 @@ export const T = {
   landSpeed: { perfect: 3, buttery: 1.5, clean: 0, sketchy: -3 },
   wobbleSeconds: 0.5,
   // Track design
-  botPopAt: 1, // the reference bot releases this far before the lip (a good, not perfect, pop)
+  botPopAt: 0.2, // s before the lip the reference bot lets go (a good, not perfect, pop)
   rampClear: 0.9, // m the landing ramp starts under the flight path, closing to 0 at the sweet spot
   rampCross: 0.08, // m of that closing done linearly, so the arc crosses the ramp rather than grazing it
   rampMin: 4, // m of landing ramp from the deck edge to the sweet spot…

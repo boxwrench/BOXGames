@@ -22,10 +22,15 @@ for (const [name, viewport] of [["desktop", { width: 1440, height: 900 }], ["pho
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `smoke-out/${name}-start.png` });
   // Let the reference bot ride; grab a screenshot the first time PJ is airborne.
-  let airShot = false;
+  let airShot = false,
+    cueShot = false;
   const until = Date.now() + 14000;
   while (Date.now() < until) {
-    const air = await page.evaluate(() => window.game.rider.state === "air");
+    const [air, cue] = await page.evaluate(() => [window.game.rider.state === "air", !!document.querySelector(".popcue.go")]);
+    if (cue && !cueShot) {
+      await page.screenshot({ path: `smoke-out/${name}-popcue.png` });
+      cueShot = true;
+    }
     if (air && !airShot) {
       await page.waitForTimeout(700); // mid-flight, so the arc and landing are in frame
       await page.screenshot({ path: `smoke-out/${name}-air.png` });

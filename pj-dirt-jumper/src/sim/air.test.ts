@@ -49,9 +49,34 @@ test("releasing pump in the perfect window pops hard", () => {
 test("releasing before the window does nothing", () => {
   const t = kicker(),
     r = riding(15, 12),
-    events = run(r, t, (r) => ({ ...NO_ACTIONS, pump: 20 - r.x > 3 }), 2, (r) => r.state === "air");
+    events = run(r, t, (r) => ({ ...NO_ACTIONS, pump: 20 - r.x > 6 }), 2, (r) => r.state === "air");
   assert.ok(!events.some((e) => e.type === "pop"));
   assert.ok(Math.abs(r.vy / r.vx - 0.7) < 0.01);
+});
+test("the pop window is measured in time, so it is as wide at speed", () => {
+  const t = kicker(),
+    r = riding(15, 12),
+    // Release ~0.25 s before the lip: outside the old 1.2 m window at this speed, inside the 0.3 s one.
+    events = run(r, t, (r) => ({ ...NO_ACTIONS, pump: (20 - r.x) / r.v > 0.25 }), 2, (r) => r.state === "air");
+  assert.deepEqual(events.find((e) => e.type === "pop"), { type: "pop", perfect: false });
+});
+test("letting go just after leaving the lip still pops", () => {
+  const t = kicker(),
+    r = riding(15, 12);
+  run(r, t, () => ({ ...NO_ACTIONS, pump: true }), 2, (r) => r.state === "air");
+  const vy = r.vy,
+    held = run(r, t, () => ({ ...NO_ACTIONS, pump: true }), 0.05),
+    late = run(r, t, () => NO_ACTIONS, 0.02);
+  assert.equal(held.length, 0);
+  assert.deepEqual(late[0], { type: "pop", perfect: false });
+  assert.ok(r.vy > vy - T.airGravity * 0.08 + T.popBoost - 0.2, `vy ${r.vy} from ${vy}`);
+});
+test("the late-pop grace runs out", () => {
+  const t = kicker(),
+    r = riding(15, 12);
+  run(r, t, () => ({ ...NO_ACTIONS, pump: true }), 2, (r) => r.state === "air");
+  run(r, t, () => ({ ...NO_ACTIONS, pump: true }), T.latePop + 0.05);
+  assert.ok(!run(r, t, () => NO_ACTIONS, 0.05).some((e) => e.type === "pop"));
 });
 test("too slow to launch rolls over the lip", () => {
   const t = kicker(),

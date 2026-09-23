@@ -34,6 +34,9 @@ test("knots move forward with no cliffs and the trail descends gently", () => {
   // Landings climb back only part of their drop (T.climbBack), so the trail descends gently, like a mountain run.
   assert.ok(k.every((p) => p.y <= 8 && p.y >= -0.1 * p.x - 25), "trail descends gently");
 });
+test("the first jump comes straight after the run-in", () => {
+  for (const seed of [1, 2, 3]) assert.equal(new TrackGen(seed).track.sections[1].kind, "tabletop");
+});
 test("every run starts on a downhill run-in", () => {
   const g = new TrackGen(7);
   assert.equal(g.track.sections[0].kind, "runin");
@@ -87,7 +90,7 @@ test("a perfect-popping rider overshoots but still lands", () => {
   let bails = 0,
     jumps = 0;
   for (let seed = 1; seed <= 30; seed++) {
-    const out = ride(seed, 2000, 0.2);
+    const out = ride(seed, 2000, 0.05);
     jumps += out.jumps;
     if (out.r.state === "bailed") bails++;
   }

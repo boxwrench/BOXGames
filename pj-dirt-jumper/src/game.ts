@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { createStage, type Stage } from "./render/stage";
 import { TrackView } from "./render/trackView";
 import { RiderView } from "./render/riderView";
@@ -119,6 +120,22 @@ export class Game {
     }
     if (was < 1.3 && t.t >= 1.3) this.hud.showEnd(this.rider, t.reason);
   }
+  /** Shows the pop ring over the next lip for the last 0.9 s of the approach. */
+  private updatePopCue(r: Rider, track: TrackGen["track"]) {
+    const jump = r.state === "riding" && !this.tumble ? track.nextJump(r.x) : undefined,
+      t = jump ? (jump.lipX - r.x) / Math.max(r.v, 1) : Infinity;
+    if (!jump || t > 0.9) return this.hud.popCue(null);
+    const p = new THREE.Vector3(jump.lipX, track.heightAt(jump.lipX) + 0.9, 0).project(this.stage.camera),
+      rect = this.stage.renderer.domElement.getBoundingClientRect();
+    this.hud.popCue({
+      t,
+      sx: rect.left + ((p.x + 1) * rect.width) / 2,
+      sy: rect.top + ((1 - p.y) * rect.height) / 2,
+      loaded: r.preload > 0.6,
+      window: T.popWindow,
+      perfect: T.perfectPopWindow,
+    });
+  }
   private frame(now: number) {
     requestAnimationFrame((t) => this.frame(t));
     const elapsed = Math.min(0.1, (now - (this.last || now)) / 1000),
@@ -161,6 +178,7 @@ export class Game {
     this.backdrop.update(this.stage.camera.position.x, this.backY);
     this.stage.sun.position.set(x - 12, y + 22, 16);
     this.stage.sun.target.position.set(x, y, 0);
+    this.updatePopCue(r, track);
     this.hud.update(r);
     this.stage.renderer.render(this.stage.scene, this.stage.camera);
   }

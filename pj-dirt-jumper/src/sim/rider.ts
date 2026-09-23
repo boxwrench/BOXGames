@@ -44,6 +44,9 @@ export interface Rider {
   /** Pending pop boost for the lip at popLip (NaN when none). */
   pop: number;
   popLip: number;
+  /** Lip of the current air, and whether this air has been popped (late pops allowed until latePop). */
+  lipX: number;
+  popped: boolean;
   /** Grab currently held (−1 none) and its pose blend 0…1. */
   grab: number;
   grabBlend: number;
@@ -68,6 +71,8 @@ export const createRider = (): Rider => ({
   wobble: 0,
   pop: 0,
   popLip: NaN,
+  lipX: NaN,
+  popped: false,
   grab: -1,
   grabBlend: 0,
   grabTime: [0, 0, 0],
@@ -90,8 +95,9 @@ function ride(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
     jump = track.nextJump(r.x),
     toLip = jump ? jump.lipX - r.x : Infinity;
   // Releasing a loaded pump in the lip window pops (spec §5.3).
-  if (jump && r.pump && !a.pump && r.preload > 0 && toLip <= T.popWindow) {
-    const perfect = toLip <= T.perfectPopWindow;
+  const toLipTime = toLip / Math.max(r.v, 1);
+  if (jump && r.pump && !a.pump && r.preload > 0 && toLipTime <= T.popWindow) {
+    const perfect = toLipTime <= T.perfectPopWindow;
     r.pop = T.popBoost * r.preload + (perfect ? T.perfectPopBonus : 0);
     r.popLip = jump.lipX;
     events.push({ type: "pop", perfect });
@@ -119,7 +125,7 @@ function ride(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
     Object.assign(r, {
       x: jump.lipX,
       y,
-      vx: steer(jump, y, vx, vy),
+      vx: steer(jump, jump.lipX, y, vx, vy),
       vy,
       pitch: angle,
       omega: 0,
@@ -131,6 +137,8 @@ function ride(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
       airTime: 0,
       pop: 0,
       popLip: NaN,
+      lipX: jump.lipX,
+      popped: boost > 0,
       stall: 0,
       state: "air",
     } satisfies Partial<Rider>);
@@ -152,19 +160,28 @@ function ride(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   return events;
 }
 /**
- * Lip magnetism: nudges takeoff speed (never lift) by up to ±T.steer so the rider's arc comes down on the jump's sweet
- * spot. Lift still decides airtime (and so tricks) and the landing angle (M2 deviation 5).
+ * Lip magnetism: nudges horizontal speed (never lift) by up to ±T.steer so an arc starting at (x0, y0) comes down on the
+ * jump's sweet spot. Lift still decides airtime (and so tricks) and the landing angle (M2 deviation 5).
  */
-export function steer(jump: Jump, lipY: number, vx: number, vy: number) {
+export function steer(jump: Jump, x0: number, y0: number, vx: number, vy: number) {
   const aim = jump.aim;
   if (!aim) return vx;
-  const disc = vy * vy + 2 * T.airGravity * (lipY - aim.landY);
+  const disc = vy * vy + 2 * T.airGravity * (y0 - aim.landY);
   if (disc < 0) return vx;
   const t = (vy + Math.sqrt(disc)) / T.airGravity;
-  return clamp((jump.landX - jump.lipX) / t, vx * (1 - T.steer), vx * (1 + T.steer));
+  return clamp((jump.landX - x0) / t, vx * (1 - T.steer), vx * (1 + T.steer));
 }
 function fly(r: Rider, a: Actions, track: Track, dt: number): SimEvent[] {
   const events: SimEvent[] = [];
+  // Late pop: letting go just after leaving the lip still counts (arcade grace).
+  if (!r.popped && r.airTime <= T.latePop && r.pump && !a.pump && r.preload > 0) {
+    r.vy += T.popBoost * r.preload;
+    r.popped = true;
+    const jump = track.nextJump(r.lipX);
+    if (jump) r.vx = steer(jump, r.x, r.y, r.vx, r.vy);
+    events.push({ type: "pop", perfect: false });
+  }
+  r.pump = a.pump;
   r.airTime += dt;
   const held = a.grab.findIndex(Boolean);
   r.grab = held;

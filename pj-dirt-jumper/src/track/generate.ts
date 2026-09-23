@@ -46,6 +46,9 @@ export class TrackGen {
       [32, -6, 0],
     ]);
     this.advance(this.track.end);
+    // Straight into a tabletop, so every run gets air right away.
+    this.jump("tabletop");
+    this.advance(this.track.end);
   }
   ensure(x: number) {
     while (this.track.end < x) this.next();
@@ -82,9 +85,9 @@ export class TrackGen {
         }
       }
   }
-  /** 2–6 rollers: crest and trough knots with zero slope give a smooth wave. */
+  /** 2–4 rollers: crest and trough knots with zero slope give a smooth wave. */
   private rollers() {
-    const n = 2 + Math.floor(this.rand() * 5),
+    const n = 2 + Math.floor(this.rand() * 3),
       points: Point[] = [];
     let dx = 0;
     for (let i = 0; i < n; i++) {

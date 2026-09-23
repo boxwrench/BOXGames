@@ -46,6 +46,7 @@ export class Hud {
       <p class="warn" data-warn>PUMP IT, PJ!</p>
       <div class="callout" data-callout><b></b><span></span></div>
       <div class="banner" data-banner></div>
+      <div class="popcue" data-popcue><i></i><b></b></div>
       <div class="end hidden" data-end role="dialog" aria-label="Run over"><h1 data-title></h1><p data-summary></p><button data-again>SEND IT AGAIN ↻</button></div>`;
     parent.append(this.el);
     this.pad = $(this.el, "[data-pad]");
@@ -87,6 +88,24 @@ export class Hud {
     $(this.el, "[data-summary]").textContent = `${Math.floor(r.distance)} m of trail. ${TIPS[reason]}`;
     $(this.el, "[data-end]").classList.remove("hidden");
     $(this.el, "[data-again]").focus();
+  }
+  /**
+   * The ring over the next lip: shrinks onto it as PJ arrives. t = seconds to the lip (null hides it).
+   * It says HOLD until the pop window, then LET GO!, turning gold in the perfect window.
+   */
+  popCue(cue: { t: number; sx: number; sy: number; loaded: boolean; window: number; perfect: number } | null) {
+    const el = $(this.el, "[data-popcue]");
+    if (!cue) {
+      el.classList.remove("show");
+      return;
+    }
+    const inWindow = cue.t <= cue.window,
+      perfect = cue.t <= cue.perfect;
+    el.className = `popcue show${inWindow ? " go" : ""}${perfect ? " perfect" : ""}`;
+    el.style.left = `${cue.sx}px`;
+    el.style.top = `${cue.sy}px`;
+    el.style.setProperty("--k", String(1 + Math.max(0, cue.t - cue.perfect) * 2.2));
+    el.querySelector("b")!.textContent = inWindow ? "LET GO!" : cue.loaded ? "READY…" : "HOLD";
   }
   hideEnd() {
     $(this.el, "[data-end]").classList.add("hidden");

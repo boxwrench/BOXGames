@@ -9,6 +9,13 @@ const dirt = new THREE.MeshStandardMaterial({ color: "#c9824a", roughness: 0.95,
 const soil = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide });
 const grass = new THREE.MeshStandardMaterial({ color: "#6cc04a", roughness: 0.9, side: THREE.DoubleSide });
 const tuftGeo = new THREE.ConeGeometry(0.14, 0.45, 5);
+const wood = new THREE.MeshStandardMaterial({ color: "#d9a066", roughness: 0.7 });
+const woodEdge = new THREE.MeshStandardMaterial({ color: "#fff1c9", emissive: "#ffd27a", emissiveIntensity: 0.6 });
+const poleMat = new THREE.MeshStandardMaterial({ color: "#f4f0e6" });
+const flagMats = [new THREE.MeshBasicMaterial({ color: "#ff4fa3", side: THREE.DoubleSide }), new THREE.MeshBasicMaterial({ color: "#c6ff3d", side: THREE.DoubleSide })];
+const unitBox = new THREE.BoxGeometry(1, 1, 1),
+  flagGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.7, -0.22, 0), new THREE.Vector3(0, -0.45, 0)]);
+const shared = new Set<THREE.BufferGeometry>([tuftGeo, unitBox, flagGeo]);
 /** Triangle strip over pairs of vertices: [a0, b0, a1, b1, …]. */
 function strip(positions: number[], material: THREE.Material, colors?: number[]) {
   const geo = new THREE.BufferGeometry(),
@@ -47,7 +54,7 @@ export class TrackView {
     const g = this.chunks.get(i)!;
     this.root.remove(g);
     g.traverse((o) => {
-      if (o instanceof THREE.Mesh || o instanceof THREE.InstancedMesh) if (o.geometry !== tuftGeo) o.geometry.dispose();
+      if (o instanceof THREE.Mesh || o instanceof THREE.InstancedMesh) if (!shared.has(o.geometry)) o.geometry.dispose();
     });
     this.chunks.delete(i);
   }
@@ -81,6 +88,32 @@ export class TrackView {
       tufts.setMatrixAt(k, m);
     }
     g.add(tufts);
+    for (const jump of this.track.jumps) if (jump.lipX >= x0 && jump.lipX < x0 + CHUNK) g.add(this.lip(jump.lipX));
+    return g;
+  }
+  /** A wooden lip plank with a glowing edge and two flags, so riders can see exactly where to pop. */
+  private lip(lipX: number) {
+    const g = new THREE.Group(),
+      angle = this.track.angleAt(lipX - 0.01),
+      y = this.track.heightAt(lipX),
+      plank = new THREE.Mesh(unitBox, wood),
+      edge = new THREE.Mesh(unitBox, woodEdge);
+    g.position.set(lipX, y, 0);
+    plank.scale.set(1.8, 0.1, HALF * 2 - 0.2);
+    plank.position.set(-0.9 * Math.cos(angle), -0.9 * Math.sin(angle) + 0.04, 0);
+    plank.rotation.z = angle;
+    edge.scale.set(0.12, 0.14, HALF * 2 - 0.1);
+    edge.position.y = 0.06;
+    plank.castShadow = edge.castShadow = true;
+    g.add(plank, edge);
+    [-1, 1].forEach((side, i) => {
+      const pole = new THREE.Mesh(unitBox, poleMat),
+        flag = new THREE.Mesh(flagGeo, flagMats[i]);
+      pole.scale.set(0.06, 2.2, 0.06);
+      pole.position.set(0, 1.1, side * (HALF + 0.35));
+      flag.position.set(0.03, 2.2, side * (HALF + 0.35));
+      g.add(pole, flag);
+    });
     return g;
   }
 }

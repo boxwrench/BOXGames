@@ -6,11 +6,11 @@ export interface Tier {
   kinds: SectionKind[];
 }
 export const TIERS: Tier[] = [
-  { from: 0, name: "Backyard Pump Track", kinds: ["rollers", "rollers", "tabletop"] },
-  { from: 400, name: "Local Dirt Jumps", kinds: ["rollers", "tabletop", "tabletop", "double", "stepup"] },
-  { from: 1200, name: "Pine Forest", kinds: ["rollers", "double", "double", "stepdown", "stepup"] },
-  { from: 2500, name: "Desert Canyon", kinds: ["rollers", "double", "canyon", "stepdown"] },
-  { from: 4000, name: "Volcano Send-Zone", kinds: ["rollers", "canyon", "megahip", "stepdown"] },
+  { from: 0, name: "Backyard Pump Track", kinds: ["tabletop", "tabletop", "rollers"] },
+  { from: 400, name: "Local Dirt Jumps", kinds: ["rollers", "tabletop", "double", "double", "stepup", "tabletop"] },
+  { from: 1200, name: "Pine Forest", kinds: ["rollers", "double", "double", "stepdown", "stepup", "tabletop"] },
+  { from: 2500, name: "Desert Canyon", kinds: ["rollers", "double", "canyon", "stepdown", "canyon"] },
+  { from: 4000, name: "Volcano Send-Zone", kinds: ["rollers", "canyon", "megahip", "stepdown", "megahip"] },
 ];
 export function tierAt(x: number) {
   let tier = TIERS[0];
