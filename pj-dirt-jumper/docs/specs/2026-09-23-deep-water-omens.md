@@ -17,7 +17,7 @@ the sun into a Bass God").
 | 1 | Bobber Moon | A giant red/white bobber rises as the moon, its line vanishing upward | — |
 | 2 | Proud Bluegill | A painted, realistic bluegill slides in: "I'm proud of you, son." (spoken via Web Speech when available) | +2,000 |
 | 3 | It's Raining Bait | Fish fall around PJ for 12 s; each one PJ touches is caught | +250 per catch |
-| 4 | Land Bass Sighted | A colossal bass dorsal fin cruises through the far hills | ×1.5 for 14 s |
+| 4 | Land Trout Sighted | A colossal trout with mountains and forest on its back swims through the hills (user-supplied art) | ×1.5 for 14 s |
 | 5 | The Bass God | Lightning strikes; the sun becomes a crowned, glowing largemouth; a choir sings | +5,000, ×2 for 20 s |
 | 6 | The Sky Is a Lake | The sky floods: water gradient, rising bubbles, giant fish swimming overhead | ×1.5 for 16 s |
 | 7 | Don't Take the Bait | A giant hook with a wriggling worm descends ahead of PJ, then yanks away | +3,000, ×2 for 10 s |

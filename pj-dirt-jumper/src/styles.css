@@ -147,3 +147,7 @@
 .titlescreen small{font-size:12px;opacity:.75;font-style:italic}
 .end .menu{background:transparent;color:var(--cream);box-shadow:none;border:2px solid #ffffff66;font-size:14px;min-height:44px;padding:8px 20px;margin-top:6px}
 @media (orientation:landscape) and (max-height:500px){.titlescreen{gap:8px}.logo b{font-size:clamp(48px,10vw,96px)}.t-controls{font-size:12px;padding:8px 14px}.titlescreen small{display:none}}
+.ticker{position:absolute;left:50%;bottom:calc(max(28px,env(safe-area-inset-bottom)) + 62px);translate:-50% 0;display:flex;gap:8px;align-items:center;max-width:min(80vw,560px);padding:9px 16px;border-radius:22px;background:#fffdf5ee;color:#1b1233;font-size:clamp(13px,1.8vw,17px);font-weight:700;font-style:italic;border:2px solid #1b1233;box-shadow:0 4px 0 #1b1233;opacity:0;pointer-events:none}
+.ticker i{font-style:normal}.ticker.show{animation:ticker 3.8s ease-out forwards}
+@keyframes ticker{0%{opacity:0;transform:translateY(12px) scale(.9)}8%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0;transform:translateY(-8px)}}
+@media (pointer:coarse){.ticker{bottom:auto;top:22%}}

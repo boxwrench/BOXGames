@@ -30,7 +30,7 @@ Land with the bike lined up with the slope; let go of grabs before touchdown. **
 
 ## Deep water
 
-Going further pays. Milestones at 300, 600, 1,000, 1,500, 2,000, 2,600, 3,300, 4,000 m (then every 800 m) pay a growing bonus and raise the depth multiplier (up to ×2). Each summons an omen, stranger the deeper you go: Bobber Moon, a Proud Bluegill ("I'm proud of you, son."), It's Raining Bait (catch fish with your face), a Land Bass, the Bass God (lightning, ×2 score), The Sky Is a Lake, and a giant hook fishing for you. Dev: `game.summon("bassGod")`, `node scripts/omens.mjs`, `node scripts/art.mjs`.
+Going further pays. Milestones at 300, 600, 1,000, 1,500, 2,000, 2,600, 3,300, 4,000 m (then every 800 m) pay a growing bonus and raise the depth multiplier (up to ×2). Each summons an omen, stranger the deeper you go: Bobber Moon, a Proud Bluegill ("I'm proud of you, son."), It's Raining Bait (catch fish with your face), a Land Trout, the Bass God (lightning, ×2 score), The Sky Is a Lake, and a giant hook fishing for you. Dev: `game.summon("bassGod")`, `node scripts/omens.mjs`, `node scripts/art.mjs`.
 
 ## Scoring
 

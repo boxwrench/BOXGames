@@ -2,6 +2,8 @@ import * as THREE from "three";
 import type { OmenKind } from "./director";
 import { paintBassGod, paintBluegill, paintFish, paintLakeSky } from "./art";
 import bluegillPhoto from "../assets/bluegill.webp";
+import bassGodPhoto from "../assets/bassgod.webp";
+import landTroutPhoto from "../assets/landtrout.webp";
 import { softTexture, type FX } from "../render/fx";
 import type { Sound } from "../audio/sound";
 import type { Hud } from "../ui/hud";
@@ -41,13 +43,18 @@ export class Omens {
   private fishTex = ["#6aa7c9", "#e3923a", "#7fb35a", "#d8c24a"].map((c) => texture(paintFish(c)));
   /** The user's photo-real bluegill; the painted one stands in until (or if) it fails to load. */
   private bluegill: HTMLImageElement | HTMLCanvasElement = paintBluegill();
-  private godTex = texture(paintBassGod());
+  /** The user's crowned, haloed Bass God; the painted one stands in until (or if) it fails to load. */
+  private god = { tex: texture(paintBassGod()) as THREE.Texture, aspect: 1 };
   private lakeTex = texture(paintLakeSky());
   private soft = softTexture();
   constructor(private stage: Stage) {
     const photo = new Image();
     photo.onload = () => (this.bluegill = photo);
     photo.src = bluegillPhoto;
+    new THREE.TextureLoader().load(bassGodPhoto, (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      this.god = { tex: t, aspect: (t.image as HTMLImageElement).height / (t.image as HTMLImageElement).width };
+    });
   }
   start(kind: OmenKind, dur: number) {
     this.running.find((r) => r.kind === kind)?.end();
@@ -56,7 +63,7 @@ export class Omens {
       bobberMoon: () => this.bobberMoon(dur),
       proudBluegill: () => this.proudBluegill(dur),
       fishRain: () => this.fishRain(dur),
-      landBass: () => this.landBass(dur),
+      landTrout: () => this.landTrout(dur),
       bassGod: () => this.bassGod(dur),
       lakeSky: () => this.lakeSky(dur),
       giantHook: () => this.giantHook(dur),
@@ -83,6 +90,7 @@ export class Omens {
   }
   /** A giant red-and-white bobber rises as the moon, its line running up out of the sky. */
   private bobberMoon(dur: number) {
+    this.stage.sound.speak("The moon is a bobber now. Do not think about it.", 0.6, 0.9);
     const g = new THREE.Group(),
       top = new THREE.Mesh(new THREE.SphereGeometry(14, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: "#ff3b2f", fog: false })),
       bottom = new THREE.Mesh(new THREE.SphereGeometry(14, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshBasicMaterial({ color: "#fff4e8", fog: false })),
@@ -117,6 +125,7 @@ export class Omens {
   }
   /** Fish fall from the sky around PJ; any PJ touches is caught. */
   private fishRain(dur: number) {
+    this.stage.sound.speak("It is raining bait. Open your mouth.", 1.3, 1.1);
     const fish: Faller[] = [];
     let clock = 0;
     this.stage.sound.play("bubbles");
@@ -163,64 +172,56 @@ export class Omens {
       },
     );
   }
-  /** A colossal bass dorsal fin carves through the far hills. */
-  private landBass(dur: number) {
-    const shape = new THREE.Shape();
-    shape.moveTo(0, 0);
-    const spines = 11;
-    for (let i = 0; i <= spines; i++) {
-      const x = i * 6,
-        h = 16 + Math.sin((i / spines) * Math.PI) * 26;
-      shape.lineTo(x + 1, h);
-      shape.lineTo(x + 5, h * 0.72);
-    }
-    shape.lineTo(spines * 6 + 20, 22);
-    shape.quadraticCurveTo(spines * 6 + 30, 8, spines * 6 + 26, 0);
-    shape.lineTo(0, 0);
-    const fin = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshBasicMaterial({ color: "#6f8f45", side: THREE.DoubleSide, transparent: true, opacity: 0.92 })),
-      edge = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshBasicMaterial({ color: "#1f2f18", side: THREE.DoubleSide }));
-    edge.scale.set(1.03, 1.04, 1);
-    edge.position.z = -0.5;
-    // Spines: dark rods from the back to each fin tip.
-    const spineMat = new THREE.MeshBasicMaterial({ color: "#1f2f18" }),
-      g = new THREE.Group();
-    for (let i = 0; i <= spines; i++) {
-      const h = 16 + Math.sin((i / spines) * Math.PI) * 26,
-        rod = new THREE.Mesh(new THREE.BoxGeometry(0.7, h, 0.2), spineMat);
-      rod.position.set(i * 6 + 1, h / 2, 0.3);
-      g.add(rod);
-    }
-    // The broad green back the fin rides on, with the bass's dark stripe.
-    const back = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ color: "#3d5a2c" })),
-      stripe = new THREE.Mesh(new THREE.PlaneGeometry(120, 3), new THREE.MeshBasicMaterial({ color: "#1f2f18" }));
-    back.scale.set(95, 16, 1);
-    back.position.set(40, -4, 0.5);
-    stripe.position.set(40, -8, 0.6);
-    g.add(edge, fin, back, stripe);
-    g.scale.set(-1.1, 1.1, 1); // swims leftward, spines trailing
-    this.root.add(g);
+  /** The user's Land Trout — mountains and forest on its back — swims through the hills, belly hidden by the ridge. */
+  private trout = (() => {
+    const t = new THREE.TextureLoader().load(landTroutPhoto);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  private landTrout(dur: number) {
+    this.stage.sound.speak("Land trout sighted. Stay calm.", 0.8, 0.95);
+    const fish = new THREE.Mesh(
+      new THREE.PlaneGeometry(130, 81),
+      new THREE.MeshBasicMaterial({ map: this.trout, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide, toneMapped: false }),
+    );
+    this.root.add(fish);
     this.stage.sound.play("thunder");
     return this.run(
-      "landBass",
+      "landTrout",
       dur,
       (_dt, pj) => {
-        const r = this.running.find((x) => x.kind === "landBass")!,
+        const r = this.running.find((x) => x.kind === "landTrout")!,
           k = r.t / dur,
-          cam = this.stage.camera.position.x;
-        g.position.set(cam + 170 - k * 360, pj.y - 16 + Math.sin(r.t * 1.4) * 2.5 + Math.min(1, r.t, dur - r.t) * 8, -120);
-        g.rotation.z = Math.sin(r.t * 0.9) * 0.05;
+          cam = this.stage.camera.position.x,
+          // Swims left through the land, rising out of the hills and diving back in like a porpoising fish.
+          surface = Math.min(1, r.t / 2, (dur - r.t) / 2);
+        fish.position.set(cam + 110 - k * 280, pj.y - 26 + surface * 30 + Math.sin(r.t * 1.3) * 4, -125);
+        fish.rotation.z = Math.cos(r.t * 1.3) * 0.08;
         // Churned-up earth where it ploughs through the hills.
-        if (Math.random() < 0.5) this.stage.fx.dust(new THREE.Vector3(g.position.x - 20 + Math.random() * 60, g.position.y - 4, -110), 1, { size: 12, spread: 6, rise: 2, life: 2.5, color: "#b88a5a", alpha: 0.5 });
+        if (Math.random() < 0.6)
+          this.stage.fx.dust(new THREE.Vector3(fish.position.x - 40 + Math.random() * 80, pj.y - 8, -112), 1, { size: 14, spread: 7, rise: 2, life: 2.5, color: "#b88a5a", alpha: 0.5 });
         return 0;
       },
-      () => this.root.remove(g),
+      () => {
+        this.root.remove(fish);
+        fish.geometry.dispose();
+        fish.material.dispose();
+      },
     );
   }
   /** Lightning strikes and the sun becomes the crowned, burning Bass God. */
   private bassGod(dur: number) {
-    const god = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.godTex, transparent: true, fog: false, depthWrite: false }));
+    const { tex, aspect } = this.god,
+      // Untouched by fog and tone mapping so the gold stays gold; high above the ridges so no pine blocks the view.
+      god = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, fog: false, depthWrite: false, depthTest: false, toneMapped: false })),
+      aura = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: this.soft, color: "#ff9f40", transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, fog: false, depthWrite: false, toneMapped: false }),
+      );
+    god.renderOrder = 5;
+    god.position.y = aura.position.y = 60;
     god.scale.set(0.01, 0.01, 1);
-    this.stage.backdrop.sunGroup.add(god);
+    aura.scale.set(0.01, 0.01, 1);
+    this.stage.backdrop.sunGroup.add(aura, god);
     const strike = () => {
       const sun = this.stage.backdrop.sunGroup.getWorldPosition(new THREE.Vector3()),
         p = this.stage.screen(sun.x, sun.y, sun.z);
@@ -239,18 +240,22 @@ export class Omens {
         const r = this.running.find((x) => x.kind === "bassGod")!,
           grow = Math.min(1, r.t / 0.6) * Math.min(1, (dur - r.t) / 0.8),
           pulse = 1 + Math.sin(r.t * 5) * 0.03;
-        god.scale.setScalar(200 * grow * pulse);
-        god.material.rotation = Math.sin(r.t * 0.8) * 0.08;
+        const w = 230 * grow * pulse;
+        god.scale.set(w, w * aspect, 1);
+        aura.scale.set(w * 1.5, w * 1.5, 1);
+        god.material.rotation = Math.sin(r.t * 0.8) * 0.05;
         return 0;
       },
       () => {
-        this.stage.backdrop.sunGroup.remove(god);
+        this.stage.backdrop.sunGroup.remove(god, aura);
         god.material.dispose();
+        aura.material.dispose();
       },
     );
   }
   /** The sky floods: a water sky, rising bubbles, giant fish drifting overhead. */
   private lakeSky(dur: number) {
+    this.stage.sound.speak("The sky is a lake. Breathe normally.", 0.9, 0.85);
     const scene = this.stage.scene,
       oldBg = scene.background,
       fog = scene.fog as THREE.Fog,
@@ -302,6 +307,7 @@ export class Omens {
   }
   /** A giant hook and wriggling worm lower from the heavens ahead of PJ, then yank away. */
   private giantHook(dur: number) {
+    this.stage.sound.speak("Do not take the bait.", 0.3, 0.75);
     const steel = new THREE.MeshStandardMaterial({ color: "#c9d2dc", metalness: 0.85, roughness: 0.25 }),
       curve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(0, 6, 0),

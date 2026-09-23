@@ -8,7 +8,7 @@ const root = join(homedir(), ".cache/ms-playwright"),
 mkdirSync("smoke-out", { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? join(root, dir, "chrome-linux64/chrome"), args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const problems = [];
-for (const kind of ["bobberMoon", "proudBluegill", "fishRain", "landBass", "bassGod", "lakeSky", "giantHook"]) {
+for (const kind of ["bobberMoon", "proudBluegill", "fishRain", "landTrout", "bassGod", "lakeSky", "giantHook"]) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page.on("pageerror", (e) => problems.push(`${kind}: ${e.message}`));
   await page.goto("http://127.0.0.1:5200/?seed=20260922&autopilot=tricks");

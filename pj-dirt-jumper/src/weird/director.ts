@@ -1,6 +1,6 @@
 import { mulberry32 } from "../rng";
 import { T } from "../tuning";
-export type OmenKind = "bobberMoon" | "proudBluegill" | "fishRain" | "landBass" | "bassGod" | "lakeSky" | "giantHook";
+export type OmenKind = "bobberMoon" | "proudBluegill" | "fishRain" | "landTrout" | "bassGod" | "lakeSky" | "giantHook";
 export interface OmenSpec {
   kind: OmenKind;
   /** Seconds the omen (and its buff) lasts. */
@@ -17,7 +17,7 @@ export const OMENS: readonly OmenSpec[] = [
   { kind: "bobberMoon", duration: 40, mult: 1, bonus: 0, title: "BOBBER MOON", line: "The moon is a bobber now. Don't think about it." },
   { kind: "proudBluegill", duration: 6, mult: 1, bonus: 2000, title: "FATHERLY APPROVAL", line: "I'm proud of you, son." },
   { kind: "fishRain", duration: 12, mult: 1, bonus: 0, title: "IT'S RAINING BAIT", line: "Catch 'em with your face!" },
-  { kind: "landBass", duration: 14, mult: 1.5, bonus: 0, title: "LAND BASS SIGHTED", line: "Something huge is swimming through the hills. ×1.5" },
+  { kind: "landTrout", duration: 14, mult: 1.5, bonus: 0, title: "LAND TROUT SIGHTED", line: "Something huge is swimming through the hills. ×1.5" },
   { kind: "bassGod", duration: 20, mult: 2, bonus: 5000, title: "THE BASS GOD IS PLEASED", line: "DIVINE BITE — ×2 SCORE" },
   { kind: "lakeSky", duration: 16, mult: 1.5, bonus: 0, title: "THE SKY IS A LAKE", line: "Breathe normally. Probably. ×1.5" },
   { kind: "giantHook", duration: 10, mult: 2, bonus: 3000, title: "DON'T TAKE THE BAIT", line: "Something up there is fishing for YOU. ×2" },

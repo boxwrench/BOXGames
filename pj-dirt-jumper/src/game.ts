@@ -26,7 +26,6 @@ const TIPS: Record<BailReason | "stalled", string> = {
   huck: "Overshot onto the flat. Line up with the landing.",
   sideways: "Line the bike up with the landing before you touch down.",
 };
-const GRADE_LINES = { perfect: "BUTTERED!", buttery: "Buttery.", clean: "Clean." } as const;
 const V = new THREE.Vector3(),
   V2 = new THREE.Vector2();
 /** Fixed-step simulation (T.simHz) with interpolated rendering, effects, sound and the run's score. */
@@ -72,6 +71,9 @@ export class Game {
   private frozen = false;
   private ended = false;
   private wasGrabbing = false;
+  private perfectStreak = 0;
+  private chatterIn = 16;
+  private speedQuipAt = -99;
   constructor(
     container: HTMLElement,
     public seed: number,
@@ -137,6 +139,8 @@ export class Game {
     this.hitstop = this.slowmo = this.freeze = 0;
     this.bailClock = -1;
     this.frozen = this.ended = false;
+    this.perfectStreak = 0;
+    this.chatterIn = 12 + Math.random() * 8;
     this.riderView.reassemble();
     this.fx.clear();
     this.trail.clear();
@@ -152,7 +156,7 @@ export class Game {
     switch (e.type) {
       case "pop":
         this.sound.play(e.perfect ? "perfectPop" : "pop");
-        this.hud.callout(this.lines.pick(e.perfect ? "perfectPop" : "pop"), "", "pop");
+        this.hud.callout(this.lines.pick(e.perfect ? "perfectPop" : "pop", this.depth), "", "pop");
         this.score.handle(e);
         break;
       case "takeoff": {
@@ -161,7 +165,7 @@ export class Game {
         const landY = this.gen.track.nextJump(r.lipX)?.aim?.landY ?? r.y,
           hang = (r.vy + Math.sqrt(Math.max(0, r.vy * r.vy + 2 * T.airGravity * (r.y - landY)))) / T.airGravity;
         if (hang >= 1.3) {
-          this.hud.callout(this.lines.pick("send"), "", "pop");
+          this.hud.callout(this.lines.pick("send", this.depth), "", "pop");
           this.hud.zoomBurst();
           this.sound.play("whoosh");
           this.cam.punch(5, 0.15);
@@ -201,9 +205,11 @@ export class Game {
           this.cam.punch(3, 0.12);
           this.sound.play("land", k);
         }
-        const line =
-          e.grade === "sketchy" ? this.lines.pick(r.grab >= 0 || this.wasGrabbing ? "grab" : "sketchy") : res.points ? this.lines.pick(landKey(res.points)) : GRADE_LINES[e.grade];
+        const line = this.landingLine(res, e.airTime);
         this.hud.landing(res, line);
+        this.perfectStreak = e.grade === "perfect" ? this.perfectStreak + 1 : 0;
+        if (this.perfectStreak >= 3) this.hud.banner(this.lines.pick("streak", this.depth, { n: this.perfectStreak }));
+        if (res.points >= 5000) this.sound.speak(line, 1.1, 1.05, 8);
         if (res.points) {
           const sp = this.screen(r.x, r.y + 1.6);
           this.hud.floater(`+${res.points.toLocaleString("en-US")}${res.multiplier > 1 ? ` ×${res.multiplier}` : ""}`, sp.x, sp.y, res.points >= 5000);
@@ -217,7 +223,9 @@ export class Game {
         if (res.tricks.length && res.name !== res.tricks.join(" + ")) this.sound.play("reel");
         if (res.flowChange > 0) {
           if (this.score.flow === T.flowMax && flowBefore < T.flowMax) {
-            this.hud.banner(this.lines.pick("onFire"));
+            const fire = this.lines.pick("onFire", this.depth);
+            this.hud.banner(fire);
+            this.sound.speak(fire, 1.2, 1.1, 6);
             this.hud.pulse("#ff6a2e");
             this.sound.play("onFire");
           } else {
@@ -229,7 +237,9 @@ export class Game {
       }
       case "bail":
         this.bailReason = e.reason;
-        this.bailLine = this.lines.pick(e.reason);
+        this.bailLine = this.lines.pick(e.reason, this.depth);
+        this.sound.speak(this.bailLine, 0.9, 1);
+        this.perfectStreak = 0;
         this.riderView.yardSale({ vx: r.vx, vy: r.vy }, this.stage.scene, Math.sign(r.vx) || 1);
         this.fx.dust(at, 18, { size: 2, spread: 2.5, rise: 1, life: 1.6 });
         this.fx.clods(at, 24, V2.set(r.vx * 0.3, 4), 4, "#b06a35");
@@ -241,9 +251,36 @@ export class Game {
         break;
       case "stalled":
         this.sound.play("stall");
-        this.endRun("stalled", this.lines.pick("stalled"));
+        this.endRun("stalled", this.lines.pick("stalled", this.depth));
         break;
     }
+  }
+  /** Milestones reached this run: deeper runs unlock weirder lines. */
+  private get depth() {
+    return this.director.depth;
+  }
+  /** The landing headline: combo names get their own lines, long airs get hang-time lines, then by points and grade. */
+  private landingLine(res: { name: string; points: number; grade: "perfect" | "buttery" | "clean" | "sketchy"; tricks: string[] }, airTime: number) {
+    if (res.grade === "sketchy") return this.lines.pick(this.wasGrabbing ? "grabLand" : "sketchy", this.depth);
+    const combo = this.lines.combo(res.name);
+    if (combo && Math.random() < 0.65) return combo;
+    if (airTime >= 2.2 && Math.random() < 0.45) return this.lines.pick("hang", this.depth);
+    if (res.points) return this.lines.pick(landKey(res.points), this.depth);
+    return this.lines.pick(res.grade, this.depth);
+  }
+  /** PJ's inner monologue while riding, and speed quips when really flying. */
+  private chatter(dt: number, r: Rider) {
+    if (this.mode !== "play" || (r.state !== "riding" && r.state !== "air")) return;
+    const speed = r.state === "air" ? Math.hypot(r.vx, r.vy) : r.v;
+    if (speed > 26 && this.clock - this.speedQuipAt > 14) {
+      this.speedQuipAt = this.clock;
+      this.hud.ticker(this.lines.pick("speed", this.depth));
+      return;
+    }
+    this.chatterIn -= dt;
+    if (this.chatterIn > 0 || r.state !== "riding") return;
+    this.chatterIn = 14 + Math.random() * 12;
+    this.hud.ticker(this.lines.pick("chatter", this.depth));
   }
   /** Test hook: summon an omen now (art review, smoke tests). */
   summon(kind: OmenKind) {
@@ -346,14 +383,15 @@ export class Game {
         this.hud.milestone(m.distance, m.bonus, this.director.depthMult);
         this.hud.omen(m.omen.title, m.omen.kind === "proudBluegill" ? "" : m.omen.line, m.omen.kind === "bassGod");
         this.hud.pulse("#8ff7ff");
+        this.hud.ticker(this.lines.pick("milestone", this.depth));
         this.sound.play("depth");
         this.omens.start(m.omen.kind, m.omen.duration);
       }
     }
     this.director.tick(dt);
     this.score.bonus = this.director.mult;
-    const buff = (["bassGod", "giantHook", "landBass", "lakeSky"] as const).find((k) => this.director.active(k) > 0),
-      spec = buff && { bassGod: "DIVINE BITE ×2", giantHook: "BAITED ×2", landBass: "LAND BASS ×1.5", lakeSky: "LAKE MODE ×1.5" }[buff];
+    const buff = (["bassGod", "giantHook", "landTrout", "lakeSky"] as const).find((k) => this.director.active(k) > 0),
+      spec = buff && { bassGod: "DIVINE BITE ×2", giantHook: "BAITED ×2", landTrout: "LAND TROUT ×1.5", lakeSky: "LAKE MODE ×1.5" }[buff];
     this.hud.badges(this.director.depthMult, spec ? `${spec} · ${Math.ceil(this.director.active(buff!))}s` : "");
     const caught = this.omens.update(dt, V.set(x, y, 0), (gx) => this.gen.track.heightAt(gx));
     if (caught) {
@@ -419,6 +457,7 @@ export class Game {
         elapsed,
       );
     this.deepWater(r, elapsed, x, y);
+    this.chatter(elapsed, r);
     this.emit(elapsed, r, x, y, pitch);
     this.trail.update(V.set(x - 0.2 * Math.cos(pitch), y + 0.9, -0.1), r.state === "air" && !this.riderView.yard, this.score.flow >= T.flowMax, elapsed);
     this.hud.hang(r.state === "air" && r.airTime > 0.9 ? r.airTime : null);

@@ -43,6 +43,7 @@ export class Hud {
       <div class="flow" data-flow aria-label="Flow"><span>FLOW</span><i></i><i></i><i></i><i></i><i></i><b>ON FIRE</b></div>
       <div class="badges"><span class="depth" data-depth></span><span class="buff" data-buff></span></div>
       <div class="omen" data-omen><b></b><span></span></div>
+      <div class="ticker" data-ticker><i>💭</i><span></span></div>
       <div class="bluegill" data-bluegill><p></p></div>
       <svg class="bolt" data-bolt viewBox="0 0 100 100" preserveAspectRatio="none"><polyline /></svg>
       <div class="feed" data-feed></div>
@@ -196,6 +197,15 @@ export class Hud {
     const el = $(this.el, "[data-hang]");
     el.classList.toggle("show", seconds !== null);
     if (seconds !== null) el.textContent = `HANG TIME ${seconds.toFixed(1)}s`;
+  }
+  private tickerTimer = 0;
+  /** PJ's passing thoughts: a small bubble near the bottom of the screen. */
+  ticker(text: string) {
+    const el = $(this.el, "[data-ticker]");
+    el.querySelector("span")!.textContent = text;
+    this.replay(el, "show");
+    clearTimeout(this.tickerTimer);
+    this.tickerTimer = window.setTimeout(() => el.classList.remove("show"), 3800);
   }
   /** Depth multiplier and any active omen buff, shown under the Flow meter. */
   badges(depthMult: number, buff: string) {

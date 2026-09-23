@@ -10,6 +10,15 @@ interface Voice {
   attack?: number;
   filter?: { type: BiquadFilterType; f0: number; f1?: number; q?: number };
 }
+/**
+ * Respell words speech engines get wrong. "bass" alone reads as the guitar; "bas" gets the fish's short "a" (as in
+ * "gas") from rule-based voices like espeak. Tweak here if a voice still says it wrong.
+ */
+const RESPELL: [RegExp, string][] = [
+  [/\bbass\b/gi, "bas"],
+  [/\bbass-ically\b/gi, "bas-ically"],
+];
+export const sayable = (text: string) => RESPELL.reduce((t, [re, to]) => t.replace(re, to), text.replace(/[!?.…]+$/g, (m) => m[0]));
 const PENTA = [0, 3, 5, 7, 10];
 const ROOTS = [82.41, 98, 110, 65.41]; // E2 G2 A2 C2 — a punk I–III–IV–VI loop
 /** Everything synthesized (spec §9): tyre crunch, freewheel buzz, cues, and a 160 BPM punk loop that layers up with Flow. */
@@ -247,11 +256,18 @@ export class Sound {
         break;
     }
   }
-  /** Spoken lines through the browser's speech synthesis, if it has a voice (and the game isn't muted). */
-  speak(text: string, pitch = 1, rate = 1) {
+  private spokeAt = 0;
+  /**
+   * Spoken lines through the browser's speech synthesis, if it has a voice (and the game isn't muted). `gap` skips
+   * the line if anything was said in the last `gap` seconds, so commentary never piles up.
+   */
+  speak(text: string, pitch = 1, rate = 1, gap = 0) {
     if (this.muted || typeof speechSynthesis === "undefined") return;
+    const now = performance.now() / 1000;
+    if (gap && now - this.spokeAt < gap) return;
+    this.spokeAt = now;
     try {
-      const u = new SpeechSynthesisUtterance(text);
+      const u = new SpeechSynthesisUtterance(sayable(text));
       u.pitch = pitch;
       u.rate = rate;
       u.volume = 1;
