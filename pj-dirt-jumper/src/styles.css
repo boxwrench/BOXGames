@@ -198,3 +198,7 @@
 }
 @media (orientation:portrait){.nowplaying{top:calc(max(12px,env(safe-area-inset-top)) + 128px);max-width:calc(100vw - 32px)}}
 .nowplaying b,.nowplaying span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* Install button / iOS hint on the title screen (src/pwa.ts). */
+.titlescreen .install{font:inherit;font-size:14px;font-weight:800;letter-spacing:1px;padding:8px 18px;min-height:44px;border:2px solid #ffffff66;border-radius:12px;background:#1b1233aa;color:var(--cream);cursor:pointer}
+.install-hint{margin:0;font-size:13px;opacity:.85}
+@media (orientation:landscape) and (max-height:500px){.titlescreen .install{min-height:40px;padding:6px 14px}.install-hint{font-size:12px}}

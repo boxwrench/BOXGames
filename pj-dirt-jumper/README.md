@@ -38,6 +38,14 @@ Distance plus air points: trick base (flip 500 / double 1,200 / triple 2,000, gr
 
 `?seed=123` rides a specific trail; the default is today's Daily Line.
 
+## Install it (web app)
+
+The game is an installable web app: on Android, Chrome offers **Install** (there's also a button on the title screen);
+on iPhone or iPad, Safari → **Share** → **Add to Home Screen**. Installed, it gets its own icon, runs full screen and
+plays offline. The build writes `sw.js` (see `vite.config.ts` and `src/sw-template.js`), which caches every game file
+and is versioned by their content, so each deploy reaches players on their next launch. Manifest and icons live in
+`public/`.
+
 ## Mobile
 
 `node scripts/mobile.mjs` (dev server running) drives emulated phones and a tablet in portrait and landscape with real

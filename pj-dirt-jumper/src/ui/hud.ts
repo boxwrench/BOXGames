@@ -68,6 +68,8 @@ export class Hud {
           <span class="kb"><kbd>Space</kbd> pump · let go on the lip to pop</span><span class="kb"><kbd>←</kbd><kbd>→</kbd> flip</span><span class="kb"><kbd>↑</kbd> Superman <kbd>↓</kbd> Tailwhip <kbd>↑↓</kbd> No-Hander</span>
           <span class="touch">Hold the left side to pump · let go on lips to pop</span><span class="touch">Drag in the air to flip · fish buttons to grab</span>
         </div>
+        <button class="install hidden" data-install>📲 Install on this device</button>
+        <p class="install-hint hidden" data-install-hint>📲 To install: tap <b>Share</b>, then <b>Add to Home Screen</b></p>
         <small>No fish were harmed. Several were proud of you.</small>
       </div>
       <div class="end hidden" data-end role="dialog" aria-label="Run over">
