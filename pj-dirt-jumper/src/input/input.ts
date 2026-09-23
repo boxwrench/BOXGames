@@ -1,8 +1,22 @@
 import { NO_ACTIONS, type Actions } from "../sim/rider";
-const PUMP_KEYS = ["Space", "ArrowDown", "KeyS"],
+const PUMP_KEYS = ["Space", "KeyS"],
   BACK_KEYS = ["ArrowLeft", "KeyA"],
   FRONT_KEYS = ["ArrowRight", "KeyD"],
-  GRAB_KEYS = ["KeyJ", "KeyK", "KeyL"];
+  GAME_KEYS = [...PUMP_KEYS, ...BACK_KEYS, ...FRONT_KEYS, "ArrowUp", "ArrowDown"];
+/**
+ * Keyboard: Space pumps/pops, ←/→ flip, ↑ Superman, ↓ Tailwhip, ↑+↓ together No-Hander (both hands off).
+ * WASD and J/K/L still work as alternates.
+ */
+export function keyActions(keys: ReadonlySet<string>): Actions {
+  const any = (codes: string[]) => codes.some((c) => keys.has(c)),
+    up = keys.has("ArrowUp"),
+    down = keys.has("ArrowDown");
+  return {
+    pump: any(PUMP_KEYS),
+    spin: Number(any(FRONT_KEYS)) - Number(any(BACK_KEYS)),
+    grab: [(up && !down) || keys.has("KeyJ"), (down && !up) || keys.has("KeyK"), (up && down) || keys.has("KeyL")],
+  };
+}
 interface PadLike {
   buttons: readonly { pressed: boolean }[];
   axes: readonly number[];
@@ -26,7 +40,7 @@ export class Input {
   private grabs: Set<number>[] = [new Set(), new Set(), new Set()];
   constructor(win: Window, pad: HTMLElement, grabButtons: HTMLElement[]) {
     win.addEventListener("keydown", (e) => {
-      if ([...PUMP_KEYS, ...BACK_KEYS, ...FRONT_KEYS].includes(e.code)) e.preventDefault();
+      if (GAME_KEYS.includes(e.code)) e.preventDefault();
       this.keys.add(e.code);
     });
     win.addEventListener("keyup", (e) => this.keys.delete(e.code));
@@ -71,15 +85,13 @@ export class Input {
     for (const p of this.pads.values()) p.x0 = p.x;
   }
   actions(): Actions {
-    const any = (codes: string[]) => codes.some((c) => this.keys.has(c)),
+    const kb = keyActions(this.keys),
       touch = [...this.pads.values()].at(-1),
       gp = padActions(navigator.getGamepads?.().find((g) => g) ?? null) ?? NO_ACTIONS;
-    const key = Number(any(FRONT_KEYS)) - Number(any(BACK_KEYS)),
-      spin = key || (touch ? dragSpin(touch.x - touch.x0) : 0) || gp.spin;
     return {
-      pump: this.pads.size > 0 || any(PUMP_KEYS) || gp.pump,
-      spin,
-      grab: [0, 1, 2].map((i) => this.keys.has(GRAB_KEYS[i]) || this.grabs[i].size > 0 || gp.grab[i]) as Actions["grab"],
+      pump: this.pads.size > 0 || kb.pump || gp.pump,
+      spin: kb.spin || (touch ? dragSpin(touch.x - touch.x0) : 0) || gp.spin,
+      grab: [0, 1, 2].map((i) => kb.grab[i] || this.grabs[i].size > 0 || gp.grab[i]) as Actions["grab"],
     };
   }
 }

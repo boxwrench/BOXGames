@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { OmenKind } from "./director";
 import { paintBassGod, paintBluegill, paintFish, paintLakeSky } from "./art";
+import bluegillPhoto from "../assets/bluegill.webp";
 import { softTexture, type FX } from "../render/fx";
 import type { Sound } from "../audio/sound";
 import type { Hud } from "../ui/hud";
@@ -38,11 +39,16 @@ export class Omens {
   readonly root = new THREE.Group();
   private running: Running[] = [];
   private fishTex = ["#6aa7c9", "#e3923a", "#7fb35a", "#d8c24a"].map((c) => texture(paintFish(c)));
-  private bluegill = paintBluegill();
+  /** The user's photo-real bluegill; the painted one stands in until (or if) it fails to load. */
+  private bluegill: HTMLImageElement | HTMLCanvasElement = paintBluegill();
   private godTex = texture(paintBassGod());
   private lakeTex = texture(paintLakeSky());
   private soft = softTexture();
-  constructor(private stage: Stage) {}
+  constructor(private stage: Stage) {
+    const photo = new Image();
+    photo.onload = () => (this.bluegill = photo);
+    photo.src = bluegillPhoto;
+  }
   start(kind: OmenKind, dur: number) {
     this.running.find((r) => r.kind === kind)?.end();
     this.running = this.running.filter((r) => r.kind !== kind);

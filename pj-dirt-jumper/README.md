@@ -18,10 +18,10 @@ npm run build
 
 | | Keyboard | Touch | Gamepad |
 |---|---|---|---|
-| Pump (hold on downslopes) | Space / ↓ / S | hold left half | A |
-| Pop (release on the lip) | release | lift thumb | release A |
+| Pump (hold on downslopes) | Space (or S) | hold left half | A |
+| Pop (let go on the lip) | release Space | lift thumb | release A |
 | Backflip / frontflip | ← / → (A / D) | drag the held thumb left / right in the air | left stick |
-| Superman / Tailwhip / No-Hander | J / K / L | 🐟 🎣 🐠 buttons | X / Y / B |
+| Superman / Tailwhip / No-Hander | ↑ / ↓ / ↑+↓ together (J / K / L) | 🐟 🎣 🐠 buttons | X / Y / B |
 | Restart | R / Enter | button | — |
 
 Land with the bike lined up with the slope; let go of grabs before touchdown. **M** mutes. `?autopilot` lets the reference bot ride (`?autopilot=tricks` adds grabs).

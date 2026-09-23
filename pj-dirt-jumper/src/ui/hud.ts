@@ -45,8 +45,8 @@ export class Hud {
       <svg class="bolt" data-bolt viewBox="0 0 100 100" preserveAspectRatio="none"><polyline /></svg>
       <div class="feed" data-feed></div>
       <div class="pad" data-pad aria-label="Hold to pump, drag to spin"><i><span>HOLD · PUMP<br>DRAG · SPIN</span></i></div>
-      <div class="grabs">${GRAB_NAMES.map((n, i) => `<button data-grab aria-label="${n}"><span>${GRAB_ICONS[i]}</span><b>${n}</b><kbd>${"JKL"[i]}</kbd></button>`).join("")}</div>
-      <p class="tip" data-tip><span class="kb">Hold <kbd>Space</kbd> on downslopes · release on the lip to <b>pop</b> · <kbd>←</kbd><kbd>→</kbd> flip · <kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> grab</span><span class="touch">Hold left side on downslopes · let go on the lip to <b>pop</b> · drag to flip · 🐟🎣🐠 grab</span></p>
+      <div class="grabs">${GRAB_NAMES.map((n, i) => `<button data-grab aria-label="${n}"><span>${GRAB_ICONS[i]}</span><b>${n}</b><kbd>${["↑", "↓", "↑↓"][i]}</kbd></button>`).join("")}</div>
+      <p class="tip" data-tip><span class="kb">Hold <kbd>Space</kbd> on downslopes · let go on the lip to <b>pop</b> · <kbd>←</kbd><kbd>→</kbd> flip · <kbd>↑</kbd> <kbd>↓</kbd> <kbd>↑↓</kbd> grab</span><span class="touch">Hold left side on downslopes · let go on the lip to <b>pop</b> · drag to flip · 🐟🎣🐠 grab</span></p>
       <p class="warn" data-warn>PUMP IT, PJ!</p>
       <div class="callout" data-callout><b></b><span></span><em></em></div>
       <div class="banner" data-banner></div>
@@ -201,13 +201,15 @@ export class Hud {
     this.replay(el, "go");
   }
   /** The painted bluegill slides in with a speech bubble. */
-  bluegill(art: HTMLCanvasElement, line: string, seconds: number) {
+  bluegill(art: HTMLImageElement | HTMLCanvasElement, line: string, seconds: number) {
     const el = $(this.el, "[data-bluegill]");
-    el.querySelector("canvas")?.remove();
+    el.querySelector("canvas,img")?.remove();
     const copy = document.createElement("canvas");
     copy.width = art.width;
     copy.height = art.height;
     copy.getContext("2d")!.drawImage(art, 0, 0);
+    // The painting faces right; flip it so every bluegill looks back at PJ.
+    if (art instanceof HTMLCanvasElement) copy.style.transform = "scaleX(-1)";
     el.prepend(copy);
     el.querySelector("p")!.textContent = line;
     el.style.setProperty("--dur", `${seconds}s`);
