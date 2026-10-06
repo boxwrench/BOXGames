@@ -50,7 +50,14 @@ A WebXR snowboarding sandbox: GPU-deformed snow, carving and elemental spells, t
 Also rideable on desktop.<br>
 **[Play](https://boxwrench.github.io/SnowVR/)** · [Source](https://github.com/boxwrench/SnowVR) · three.js + WebXR
 </td>
-<td width="50%" valign="top"></td>
+<td width="50%" valign="top">
+<a href="https://boxwrench.github.io/landscape-forge/"><img src="docs/images/landscape-forge.jpg" alt="Landscape Forge: a snow-streaked peak rising out of a still fjord"></a>
+
+**Landscape Forge**<br>
+Explorable procedural landscapes in one HTML file: eroded mountains, reflective lakes, forests and wind-blown
+grass, with Painterly, Cel and Watercolor styles. Fly, walk or take the guided tour, and remix worlds as JSON.<br>
+**[Play](https://boxwrench.github.io/landscape-forge/)** · [Source](https://github.com/boxwrench/landscape-forge) · three.js
+</td>
 </tr>
 </table>
 
