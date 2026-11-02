@@ -1,0 +1,8 @@
+.local-worker/
+__pycache__/
+*.py[cod]
+*.rbxl.lock
+*.rbxlx.lock
+.env
+.env.*
+!.env.example

@@ -1,0 +1,10 @@
+{
+  "task": "Review the existing Studio-only smoke test for the Plateau 0 connected workshop. If a concrete error or meaningful missing check is visible, propose a minimal correction. Keep it Roblox Luau, preserve all existing folder/config checks, do not add gameplay or later milestone features, and do not claim to have run Studio. If no change is needed return an empty files array.",
+  "read": [
+    "src/server/WorkshopSmokeTest.server.luau",
+    "src/shared/Config.luau",
+    "studio/create_workshop.luau"
+  ],
+  "write": ["src/server/WorkshopSmokeTest.server.luau"],
+  "max_tokens": 3072
+}

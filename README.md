@@ -65,6 +65,7 @@ grass, with Painterly, Cel and Watercolor styles. Fly, walk or take the guided t
 
 | Folder | What it is |
 | --- | --- |
+| [`snow-crown/`](snow-crown/) | Snow Crown: Roblox snowboarding game in preparation, with a portable Studio and local-worker setup. |
 | [`pj-dirt-jumper/`](pj-dirt-jumper/) | PJ's Dirt Jumper: source, design docs, tests. Deployed to GitHub Pages by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on every push to `main` that touches it. |
 | [`archive/noise-floor/`](archive/noise-floor/) | **Archived.** NOISE FLOOR, an early Go + Vulkan (Kaiju Engine) demo starring BX-77 "Boxwrench". Kept for reference; not maintained. |
 
