@@ -2,8 +2,9 @@
 > as a design reference, with its repository location updated to match the
 > user's decision to keep the project in `BOXGames/snow-crown/`.
 > Follow [STATUS.md](STATUS.md) and [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for the
-> current checkpoint and setup. The Studio connection and gameplay gates are
-> not passed merely because the files are present.
+> current checkpoint and setup. The client bootstrap uses a LocalScript in
+> StarterPlayerScripts to avoid duplicate execution. The Studio connection and
+> gameplay gates are not passed merely because the files are present.
 
 # Snow Crown
 ## Research-backed Roblox development blueprint
@@ -334,7 +335,7 @@ ServerScriptService
 StarterPlayer
 └── StarterPlayerScripts
     └── SnowCrownClient
-        ├── Bootstrap.client
+        ├── Bootstrap.local
         ├── InputController
         ├── MovementController
         ├── CameraController

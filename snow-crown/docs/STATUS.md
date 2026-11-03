@@ -12,6 +12,7 @@ in the historical document. Start with [WINDOWS_SETUP.md](WINDOWS_SETUP.md).
 | --- | --- | --- |
 | Workshop folders and script files prepared | Prepared | Source files and Studio command-bar helper in this folder |
 | Local-worker bridge | Prepared | Nine Python checks passed against a mock server; a real model is not yet connected |
+| Generated place template | PREPARED, NOT RUN | Five offline checks passed for XML, hierarchy, references, sources, and overwrite protection; Studio must open and test it |
 | Studio place and MCP connection | NOT RUN | Connected Studio instance; inspect its tree and Output |
 | Script Sync, all three roots | NOT RUN | Local edit appears in Studio and Studio edit appears locally; restore test change |
 | Client and server bootstrap | NOT RUN | One ready line from each per playtest, no red errors |
@@ -33,3 +34,7 @@ Studio checks pass. Human evaluation is required for movement feel later.
 - 2026-11-02: Prepared the workshop and portable worker outside Studio. Nine
   local-worker checks passed against a mock server. Roblox execution, real-model
   connectivity, CCL, and human playtests are pending.
+- 2026-11-02: Prepared an offline-generated place from licensed Roblox test
+  fixtures and changed the client bootstrap to a `LocalScript` to avoid duplicate
+  execution. Five place-generation checks and nine local-worker checks passed.
+  Studio validation and the two-playtest gate remain open.

@@ -18,21 +18,33 @@ cd BOXGames/snow-crown
 If you already have the repository, pull your intended branch instead of
 cloning again. Do not discard local changes.
 
-## 2. Create the empty Studio place
+## 2. Open the prepared workshop
 
-1. Open Studio, sign in, choose **Baseplate**, and save the place as
-   `SnowCrownDev.rbxlx` (or `.rbxl`) somewhere you can back up. Put a deliberate
-   checkpoint under `snow-crown/place/` if you want it versioned in Git.
-2. Name the experience `Snow Crown Dev` and configure a maximum of 8 players
+The repo contains `place/SnowCrownDev.template.rbxlx`, assembled offline from
+licensed Roblox test fixtures and this project's scripts. Its XML and hierarchy
+passed offline checks, but **it has not yet been opened in Roblox Studio**.
+
+1. Open Studio and sign in. Use **File → Open** to select the template.
+2. Use **File → Save As** immediately to make a working copy named
+   `SnowCrownDev.rbxlx` (or `.rbxl`). Keep the tracked template unchanged.
+3. Name the experience `Snow Crown Dev` and configure a maximum of 8 players
    when the experience settings are available. It need not be publicly released.
-3. While **not** playtesting, open Studio's Command Bar, paste the entire
-   contents of `studio/create_workshop.luau`, and execute it. It only creates
-   missing Snow Crown folders; if an existing object conflicts it stops.
-4. Confirm Output contains `[SnowCrown] empty workshop folders ready`.
+4. In Explorer, confirm the Snow Crown folders and scripts are present. Do not
+   run `studio/create_workshop.luau` on this template; the folders already exist.
+
+If the generated place does not open correctly, record the exact error, then
+create a new **Baseplate** instead. While not playtesting, run the contents of
+`studio/create_workshop.luau` in Studio's Command Bar and confirm Output says
+`[SnowCrown] empty workshop folders ready`. Continue with Script Sync below to
+install the source files. This alternative is also awaiting Studio validation.
 
 The `.rbxlx` or `.rbxl` place contains the scene and other Studio objects.
 Script Sync alone is not a complete place backup. Before changing an existing
 place, save a separate checkpoint; do not apply this helper to an unknown place.
+To check that the tracked template still matches the local source, run
+`py -3 tools/build_place.py --check place/SnowCrownDev.template.rbxlx`. To
+generate a separate new template after source changes, run
+`py -3 tools/build_place.py`; it refuses to overwrite an existing output.
 
 ## 3. Connect Codex to Studio
 
@@ -61,12 +73,16 @@ matching directory in your clone:
 | `ServerScriptService/SnowCrownServer` | `snow-crown/src/server` |
 | `StarterPlayer/StarterPlayerScripts/SnowCrownClient` | `snow-crown/src/client` |
 
-The files ending `.server.luau`, `.client.luau`, and `.luau` correspond to a
-server Script, client Script, and ModuleScript respectively. If Studio shows a
-conflict dialog, inspect the listed changes. For a newly created, empty Studio
-folder with these repository files on disk, choose the disk version only when
-the dialog confirms it will add the expected scripts without removing anything
-you want to keep. Stop and back up if the place or folder is not empty.
+The files ending `.server.luau`, `.local.luau`, and `.luau` correspond to a
+server Script, LocalScript, and ModuleScript respectively. The client bootstrap
+uses a LocalScript in StarterPlayerScripts to avoid executing both the starter
+script and its per-player copy. The generated place already contains those
+scripts. If Studio shows a conflict dialog, inspect the listed changes. For a
+fresh template whose scripts match this checkout, choose a direction only after
+confirming that it will preserve your intended files. If you created a blank
+place instead, select the disk version only when the dialog confirms it will
+add the expected scripts without removing anything you want to keep. Stop and
+back up if the place or folder contains other work.
 
 ## 5. Run the workshop checks
 

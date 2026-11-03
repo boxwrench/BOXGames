@@ -1,4 +1,5 @@
 --!strict
+-- A LocalScript in StarterPlayerScripts runs from the per-player copy.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local root = ReplicatedStorage:WaitForChild("SnowCrown", 10)
