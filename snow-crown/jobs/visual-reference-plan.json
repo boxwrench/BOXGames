@@ -1,0 +1,9 @@
+{
+  "task": "Draft a 250-400 word future visual-work brief using only the supplied text. Choose at most three entries from resources/README.md; for each, name the transferable method or asset type, its Roblox adaptation, source URL, and evidence to capture. Include a small fixed-camera review plan and a first bounded local-agent task. Keep Plateau 0 active: this is documentation only, with no implementation or claim that Studio, images, models, linked pages, or licenses were inspected. You cannot open URLs or see images through this helper. Treat aesthetic choices and scene construction as proposals for a later milestone, preserve deferred water/deformation scope, and distinguish text planning from actual visual review. Write only docs/VISUAL_REFERENCE_PLAN.md.",
+  "read": [
+    "resources/README.md",
+    "docs/STATUS.md"
+  ],
+  "write": ["docs/VISUAL_REFERENCE_PLAN.md"],
+  "max_tokens": 1536
+}

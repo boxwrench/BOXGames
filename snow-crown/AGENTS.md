@@ -3,6 +3,8 @@
 This project is a Roblox adaptation of SnowVR. Work inside `snow-crown/`; do
 not alter other BOXGames projects. Read `README.md` and `docs/STATUS.md` first.
 Consult only the needed section of `docs/DEVELOPMENT_BLUEPRINT.md`.
+For visual or asset work, read `resources/README.md`, then only the relevant
+upstream reference. Keep visual plans within the active milestone.
 
 - The active milestone is Plateau 0: a connected workshop. Do not build arena,
   board, movement, camera, combat, rounds, currency, or later milestones until

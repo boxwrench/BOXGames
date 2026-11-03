@@ -17,6 +17,9 @@ Studio. There is no playable Snow Crown game yet.
 3. If you have a local model server, set up [the local worker](docs/LOCAL_WORKER.md).
 4. After Plateau 0 passes, use the blueprint to create the movement toy.
 
+[Visual resources](resources/README.md) maps the Waterscape catalog to Roblox
+asset creation and visual review, with a small local-worker planning job.
+
 The worker guide includes a bounded proposal bridge for a llama.cpp-compatible
 server and an optional full local Codex agent workflow. Neither requires the
 cloud supervisor to generate every routine change.
@@ -36,6 +39,7 @@ repository; this `BOXGames/snow-crown/` folder is the current project home.
 | `place/` | Generated workshop place template; Studio validation pending |
 | `third_party/roblox-test-files/` | MIT-licensed reference fixtures used to build the place |
 | `docs/` | Blueprint, Windows setup, local-worker guide, status |
+| `resources/` | Selected visual references and their Roblox adaptations |
 | `tools/`, `jobs/`, `tests/` | Local worker and its offline checks |
 
 The repository is public. Local endpoint settings, access tokens, output, and

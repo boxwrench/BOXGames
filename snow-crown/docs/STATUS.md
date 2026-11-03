@@ -1,6 +1,6 @@
 # Snow Crown: current checkpoint
 
-Last updated: 2026-11-02.
+Last updated: 2026-11-03.
 
 ## Plateau 0 — connected workshop: NOT YET VERIFIED
 
@@ -31,6 +31,9 @@ Studio checks pass. Human evaluation is required for movement feel later.
 
 ## Session log
 
+- 2026-11-03: Added a Roblox-specific shortlist from the Waterscape visual
+  resource catalog and a bounded text-only local-worker planning job. No assets
+  were imported or tools installed; visual and Studio validation remain pending.
 - 2026-11-02: Prepared the workshop and portable worker outside Studio. Nine
   local-worker checks passed against a mock server. Roblox execution, real-model
   connectivity, CCL, and human playtests are pending.
